@@ -6,7 +6,6 @@ function test() {
 }
 
 test();
-var_dump($a);
 /**
  * @assert $a == undefined
  */

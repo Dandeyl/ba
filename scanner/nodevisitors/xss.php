@@ -48,10 +48,13 @@ class NodeVisitor_Xss extends PHPParser_NodeVisitorAbstract
         // printf, vprintf, print_r and user defined functions
         if($node instanceof PHPParser_Node_Expr_FuncCall) {
             $name = Helper_NameResolver::resolve($node);
-            $func = ScanInfo::findFunction($name);
-            // check if function is vulnerable
-            if($func->isVulnerable('xss')) {
-                return $func;
+            $func = false;//ScanInfo::findFunction($name);
+            
+            if($func) {
+                // check if function is vulnerable
+                if($func->isVulnerable('xss')) {
+                    return $func;
+                }
             }
         }
         

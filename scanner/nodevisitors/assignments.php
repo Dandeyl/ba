@@ -155,8 +155,7 @@ class NodeVisitor_Assignments extends PHPParser_NodeVisitorAbstract
     protected function resolveVariable(PHPParser_Node $node, $assignment_type) {
         // get resolved name
         $name    = Helper_NameResolver::resolve($node->var);
-        if($name == '$baz') {
-            $breakpoint = true;}
+       
         // check resolved name
         if(!$this->isValidName($name, Assignment::TargetVariable)) {
             if($name == false) {

@@ -44,6 +44,30 @@ class VarTest extends PHPUnit_Framework_TestCase {
         $this->assertEquals(1, ScanInfo::getNumVulnerabilities());
     }
     
+    /**
+     * Unset a variable that was made visible in a function using global
+     * shouldnt affect the value out of the function
+     */
+    public function testVar5_UnsetGlobal() {
+        $argv[1] = self::srcPath.'testfile05.php';
+        require(self::cmdPath);
+        
+        $a = ScanInfo::findVar('$a');
+        $this->assertEquals(4, $a->getValue());
+    }
+    
+    /**
+     * Unset a variable that was made visible in a function using $GLOBALS
+     * should affect the value out of the function
+     */
+    public function testVar6_UnsetGLOBALS() {
+        $argv[1] = self::srcPath.'testfile06.php';
+        require(self::cmdPath);
+        
+        $a = ScanInfo::findVar('$a');
+        $this->assertEquals(false, $a);
+    }
+    
     public function testVar10_SimpleVulnerability() {
         $argv[1] = self::srcPath.'testfile10.php';
         require(self::cmdPath);
