@@ -1,0 +1,1 @@
+Objects represent something, e.g. files, variables or functions.

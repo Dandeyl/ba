@@ -1,0 +1,1 @@
+Nodevisitors are classes that get called on every node in the php source. Each nodevisitor has another job. Nodevisitors often call helpers.
