@@ -21,9 +21,7 @@ class Helper_ExpressionResolver {
         $resolved->setExecutable(false);
         $resolved->setExpression($expr);
         $resolved->setSafeReturn(false);
-        #$resolved->setSecuredFor(array());
         $resolved->setUserDefined(false);
-        #$resolved->setValue(null);
         
         if($expr instanceof PHPParser_Node_Scalar) {
             $this->resolveScalar($expr);
@@ -42,6 +40,10 @@ class Helper_ExpressionResolver {
         elseif($expr instanceof PHPParser_Node_Expr_FuncCall) {
             $this->resolveExprFunctionCall($expr);
         }
+        elseif($expr instanceof PHPParser_Node_Arg) {
+            $this->resolveArg($expr);
+        }
+        
         
         
     }
@@ -180,7 +182,48 @@ class Helper_ExpressionResolver {
      * @param PHPParser_Node_Expr $expr
      */
     protected function resolveExprFunctionCall(PHPParser_Node_Expr_FuncCall $expr) {
-        $func_name = Helper_NameResolver::resolve($expr);
+        // get the name of the function and look it up
+        $name = Helper_NameResolver::resolve($expr);
+        $func = ScanInfo::findFunction($name);
+        // if it's not defined (yet), add a notice to ScanInfo
+        if(!$func) {
+            ScanInfo::addNotFoundFunction($name);
+            $this->obj_resolved->setValue(null);
+            return;
+        }
+        
+        // if it is a system function: execute it if it's safe, otherwise generate a random value
+        if(!$func->isUserDefined()) {
+            if($func->isExecutable()) {
+                $values     = array();
+                $references = array();
+                $error  = false;
+                
+                foreach($expr->args as $arg) {
+                    /*@var $val Obj_Resolved*/
+                    $val = self::resolve($arg->value);
+                    if($val->isResolveError()) {
+                        $error = true;
+                    }
+                    else {
+                        $values[]     = $val->getValue();
+                        $references[] = $arg->byRef; 
+                    }
+                }
+                if(!$error) {
+                    // Todo: Fine Tuning ^^
+                    $this->obj_resolved->setValue(call_user_func_array($name, $values));
+                }
+            }
+        }
+    }
+    
+    /**
+     * 
+     * @param PHPParser_Node_Arg $arg
+     */
+    protected function resolveArg(PHPParser_Node_Arg $arg) {
+        
     }
     
     /**

@@ -94,6 +94,7 @@ abstract class Scanner {
         $traverser->addVisitor(new NodeVisitor_QualifiedNameResolver);
         $traverser->addVisitor(new NodeVisitor_Scope);
         $traverser->addVisitor(new NodeVisitor_Include);
+        $traverser->addVisitor(new NodeVisitor_Function);
         $traverser->addVisitor(new NodeVisitor_Assignments);
         $traverser->addVisitor(new NodeVisitor_ControlStructure);
         $traverser->addVisitor(new NodeVisitor_Xss);
@@ -193,7 +194,16 @@ abstract class Scanner {
     }
     
     /**
-     * Scan a file that has already been scanned. Doesn't add it to the file list
+     * This method gets called when the current file is scanned to the end
+     */
+    public static function scanFileEnd($exit=false) {
+        ScanInfo::parentFile($exit);
+    }
+    
+    
+    
+    /**
+     * Walk to a given node in the file without scanning the nodes until this node is set
      * @param string $file Path to the file that gets scanned
      * @param NodeVisitor_WalkTo From which node the scanning process shall be started.
      */
@@ -215,6 +225,7 @@ abstract class Scanner {
             echo 'Parse Error: ', $e->getMessage();
         }
     }
+    
     /**
      * This method gets called after the node we walked to was found. Deletes all NodeVisitor_WalkTo
      * and re-enable all nodevisitors.
@@ -226,10 +237,16 @@ abstract class Scanner {
     }
     
     /**
-     * This method gets called when the current file is scanned to the end
+     * Scan a given set of statements, i.e. to analyse functions or classes
+     * @param string $identifier
+     * @param array $stmts
      */
-    public static function scanFileEnd() {
-        ScanInfo::parentFile();
+    public static function scanStatements($identifier, array $stmts) {
+        
+    }
+    
+    public static function scanStatementsEnd() {
+        
     }
     
     

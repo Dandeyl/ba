@@ -4,7 +4,12 @@
  */
 class Obj_Varlist {
     /**
-     * List of variables initialised during parsig process
+     * List of variables initialised during parsing process.
+     * array(
+     *    'superglobal' => array(Obj_Variable, Obj_Variable, ...),
+     *    'global' => array(),
+     *    'Func#test' => array()
+     * )
      * @var Obj_Variable[]
      */
     protected $variables = array();
@@ -22,19 +27,30 @@ class Obj_Varlist {
     protected $vars_referencing_to_undefined_variables;
     
     
+    /**
+     * Initialises an empty list of undefined variables
+     */
     public function __construct() {
-        //$this->variables = array();
-        //$this->scope = '';
+        $this->variables['superglobal'] = array();
+        $this->variables['global'] = array();
         $this->vars_referencing_to_undefined_variables = new Obj_UndefinedVariableReferences;
     }
     
+    /**
+     * Set the current scope
+     * @param string $scope
+     */
     public function setScope($scope) {
         $this->scope = $scope;
         $this->vars_referencing_to_undefined_variables->setScope($scope);
     }
     
+    /**
+     * Get the current scope
+     * @return type
+     */
     public function getScope() {
-        return $this->scope;
+        return ($this->scope ?: 'global');
     }
     
     /**
@@ -43,13 +59,19 @@ class Obj_Varlist {
      * @return Obj_Variable|int|false Die Var
      */
     public function find($name, $return_key = false) {
-        foreach($this->variables as $key => &$var) {
-            if($var->getName() == $name 
-               && ($var->hasScope($this->getScope())
-                   || $var->isSuperGlobal())
-               ) 
+        // search in SUPERGLOBAL scope
+        foreach($this->variables['superglobal'] as $key => &$var) {
+            if($var->getName() == $name) 
             {
-                return (!$return_key) ? $var :   $key;
+                return (!$return_key) ? $var :   array('superglobal', $key);
+            }
+        }
+        
+        // search in current scope
+        foreach($this->variables[$this->getScope()] as $key => &$var) {
+            if($var->getName() == $name)
+            {
+                return (!$return_key) ? $var :   array($this->getScope(), $key);
             }
         }
         
@@ -67,7 +89,7 @@ class Obj_Varlist {
     /**
      * Adds a variable to the varlist or overwrites an existing one
      * @param Obj_Variable $var
-     * @return bool Was pushing the variable successful
+     * @return bool Was pushing the variable successful?
      */
     public function push(Obj_Variable $var) {
         // if reference is specified by a string, the variable does not exist yet
@@ -81,6 +103,7 @@ class Obj_Varlist {
         
         if(!$hasref) {
             $oldvar = $this->find($var->getName());
+            
             // variable already exists
             if($oldvar !== false) {
                 /* @var $oldvar Obj_Variable */
@@ -99,9 +122,11 @@ class Obj_Varlist {
             
             // variable does not exist yet
             else {
-                $this_variables_key = count($this->variables);
-                $this->variables[]  = $var;
-                $var = &$this->variables[$this_variables_key];
+                $scope = ($var->isSuperGlobal()) ? 'superglobal' : $this->getScope();
+                
+                $this_variables_key = count($this->variables[$scope]);
+                $this->variables[$scope][]  = $var;
+                $var = &$this->variables[$scope][$this_variables_key];
             }
         }
         
@@ -119,20 +144,20 @@ class Obj_Varlist {
             
             // variable has reference > current variable does not exist yet 
             if($oldvar === false) {
-                $var->setReferenceTo($this->variables[$refered_variable_key]);
-                $this_variables_key = count($this->variables);
-                $this->variables[]  = $var;
-                $var = &$this->variables[$this_variables_key];
+                $var->setReferenceTo($this->variables[$refered_variable_key[0]][$refered_variable_key[1]]);
+                $this_variables_key = count($this->variables[$refered_variable_key[0]]);
+                $this->variables[$refered_variable_key[0]][]  = $var;
+                $var = &$this->variables[$refered_variable_key[0]][$this_variables_key];
             }
             
             // variable has reference > current variable already exists 
             else {
-                 $refered_variable = clone $this->variables[$refered_variable_key];
+                 $refered_variable = clone $this->variables[$refered_variable_key[0]][$refered_variable_key[1]];
                  $refered_variable->setReferenceTo($refered_variable);
                  $refered_variable->toHistory();
                  
                  $var->setHistory($refered_variable->getHistory());
-                 $var->setReferenceTo($this->variables[$refered_variable_key]);
+                 $var->setReferenceTo($this->variables[$refered_variable_key[0]][$refered_variable_key[1]]);
                  $this->replace($var->getName(), $var);
                 
             }
@@ -151,7 +176,7 @@ class Obj_Varlist {
         if($undefined_references) {
             foreach($undefined_references as $var_name) {
                 $variable_key = $this->find($var_name, true);
-                $variable = $this->variables[$variable_key];
+                $variable = $this->variables[$variable_key[0]][$variable_key[1]];
                 $variable->setReferenceTo($arg_var);
                 $this->vars_referencing_to_undefined_variables->unsetUndefinedReference($var_name);
             }
@@ -165,11 +190,11 @@ class Obj_Varlist {
     public function remove($name) {
         // search for this variable in current scope
         $key = $this->find($name, true);
-        $oldvar = $this->variables[$key];
+        $oldvar = $this->variables[$key[0]][$key[1]];
         
         if($oldvar !== false) {
             $type = $oldvar->getType();
-            unset($this->variables[$key]);
+            unset($this->variables[$key[0]][$key[1]]);
             
             // TODO: if variable is an array, delete each element
         }
@@ -185,12 +210,12 @@ class Obj_Varlist {
     private function &replace($name, Obj_Variable $variable) {
         // search for this variable in current scope
         $key = $this->find($name, true);
-        $oldvar = $this->variables[$key];
+        $oldvar = $this->variables[$key[0]][$key[1]];
         
         if($oldvar !== false) {
             $type = $oldvar->getType();
-            $this->variables[$key] = $variable;
-            return $this->variables[$key];
+            $this->variables[$key[0]][$key[1]] = $variable;
+            return $this->variables[$key[0]][$key[1]];
             
             // TODO: if variable is an array, delete each element
         }

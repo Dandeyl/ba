@@ -22,6 +22,13 @@ class Obj_Resolved extends Obj_CodeSequenceInfo {
     protected $secured_for = array();
     
     /**
+     * Did an error occur resolving the function? E.g. a function that is not executable
+     * had to be executed to get its value.
+     * @var bool 
+     */
+    protected $resolve_error = false;
+    
+    /**
      * Sets the resolved value.
      * @param mixed $value
      */
@@ -111,5 +118,21 @@ class Obj_Resolved extends Obj_CodeSequenceInfo {
      */
     public function isSecuredFor($attack) {
         return in_array($attack, $this->secured_for);
+    }
+    
+    /**
+     * Set if an error occured resolving this value
+     * @param type $error_occured
+     */
+    public function setResolveError($error_occured) {
+        $this->resolve_error = (bool) $error_occured;
+    }
+    
+    /**
+     * Did an error occur resolving this function?
+     * @return bool
+     */
+    public function isResolveError() {
+        return $this->resolve_error;
     }
 }

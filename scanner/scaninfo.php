@@ -119,10 +119,17 @@ abstract class ScanInfo {
      * Return to the parent file in file tree.
      * @param string $file
      */
-    public static function parentFile() {
+    public static function parentFile($exit=false) {
         // are there paths left to go?
         try {
-            return self::$filetree->parent();
+            if(!$exit) {
+                return self::$filetree->parent();
+            }
+            else { // exit
+                do {
+                    self::$filetree->parent();
+                } while(true);
+            }
         }
         // Ende of Scan reached, check if there are ControlStructure paths left
         catch(Obj_Filetree_EndOfTree_Exception $e) {
@@ -211,8 +218,15 @@ abstract class ScanInfo {
      * @return &Obj_Variable|false
      */
     public static function findVar($name) {
-        if($name == '$baz') {
-            $breakpoint = true;
+        if(substr($name, 0, 8) == '$GLOBALS') {
+            $scope_backup = self::$varlist->getScope();
+            $global_name  = substr($name, 9, -1);
+            
+            self::$varlist->setScope("");
+            $var = self::$varlist->find($global_name);
+            self::$varlist->setScope($scope_backup);
+            
+            return $var;
         }
         
         self::$varlist->setScope(self::getScope());
@@ -227,6 +241,18 @@ abstract class ScanInfo {
      */
     public static function addVar(Obj_Variable $insertvar) {
         $name   = $insertvar->getName();
+        
+        if(substr($name, 0, 8) == '$GLOBALS') {
+            $scope_backup = self::$varlist->getScope();
+            $global_name  = substr($name, 9, -1);
+            $insertvar->setName($global_name);
+            
+            self::$varlist->setScope("");
+            $return = self::$varlist->push($insertvar);
+            self::$varlist->setScope($scope_backup);
+            
+            return $return;
+        }
         return self::$varlist->push($insertvar);
     }
     
@@ -241,6 +267,37 @@ abstract class ScanInfo {
     }
     
     
+    //////////////////////////////////////////
+    //   ---- function related methods
+    //////////////////////////////////////////
+    
+    /**
+     * 
+     * @param string $name Name of the function.
+     * @param bool $return_key Should the key be returned instead of the function?
+     * @return Obj_Function|int|false
+     */
+    public static function findFunction($name, $return_key=false) {
+        foreach(self::$functions as $key => $func) {
+            if($func->getName() == $name) {
+                if(!$return_key) {
+                    return $func;
+                }
+                return $key;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Add a function to the function list
+     * @param Obj_Function $function
+     */
+    public static function addFunction(Obj_Function $function) {
+        self::$functions[] = $function;
+    }
+
+
     //////////////////////////////////////////
     //   ---- scope related methods
     //////////////////////////////////////////
@@ -272,6 +329,7 @@ abstract class ScanInfo {
     ///////////////////////////////////////////////////
     //   ---- control structure related methods
     //////////////////////////////////////////////////////
+    
     
     public static function findControlStructure(Obj_ControlStructure $struct) {
         return self::findControlStructureByNode($struct->getNode());
@@ -371,6 +429,7 @@ abstract class ScanInfo {
         self::$scope = $export["scope"];
         self::$scan_run = $export["scan_run"];
     }
+    
     
     /**
      * Dump all scan results

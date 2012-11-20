@@ -17,8 +17,8 @@ class Obj_Variable {
     protected $assignment_node;
     
     /**
-     * List of scopes where the variable is visible. If it's an empty array it is visible in global scope. 
-     * @var array 
+     * List of scopes where the variable is visible. If it's an empty string it is visible in global scope. 
+     * @var string
      */
     protected $scope;
     
@@ -45,6 +45,12 @@ class Obj_Variable {
      * @var string 
      */
     protected $type;
+    
+    /**
+     * If the variable is static, it won't get deleted when leaving a function
+     * @var bool 
+     */
+    protected $static;
     
     /**
      * If this variable is a reference to another variable, this property contains the name fo the referenced variable.
@@ -82,6 +88,7 @@ class Obj_Variable {
         $this->scope = array();
         $this->value = null;
         $this->type  = 'null';
+        $this->static = false;
         $this->secured_for  = array();
         $this->user_defined = false;
         $this->reference_to = &$this;
@@ -158,14 +165,6 @@ class Obj_Variable {
     }
         
     /**
-     * Adds another scope for this variable, e.g. if it is made vissible in a function via "global". 
-     * @param type $scope
-     */
-    public function addScope($scope) {
-        $this->scope[] = $scope;
-    }
-    
-    /**
      * Sets if this variable is visible in every scope
      * @param bool $superglobal
      */
@@ -195,13 +194,12 @@ class Obj_Variable {
      * @return boolean
      */
     public function hasScope($scope) {
-        /*if($scope == null) { // null or empty string
+        if($scope == null) { // null or empty string
             if(empty($this->scope)) {
                 return true;
             }
         }
-        else*/
-        if(in_array($scope, $this->scope)) {
+        elseif($scope == $this->scope) {
             return true;
         }
         return false;
@@ -259,6 +257,8 @@ class Obj_Variable {
         $this->getReferenceTo()->value = $newval;
         $this->getReferenceTo()->type  = gettype($newval); 
     }
+    
+    
     public function getValue() {
         return $this->getReferenceTo()->value; 
     }
@@ -268,13 +268,30 @@ class Obj_Variable {
         return $this->getReferenceTo()->type;
     }
     
-    // Is User Defined?
+    /**
+     * Set if the variable is user defined
+     * @param bool $userdefined
+     */
     public function setUserDefined($userdefined) {
         $this->getReferenceTo()->user_defined = (bool) $userdefined;
     }
     
+    /**
+     * Get if the variable is user defined
+     * @return type
+     */
     public function isUserDefined() {
         return $this->getReferenceTo()->user_defined; 
+    }
+    
+    
+    
+    public function setStatic($static) {
+        $this->static = (bool) $static;
+    }
+    
+    public function isStatic() {
+        return $this->static;
     }
     
     // is secured

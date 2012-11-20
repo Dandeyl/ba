@@ -68,6 +68,30 @@ class VarTest extends PHPUnit_Framework_TestCase {
         $this->assertEquals(false, $a);
     }
     
+    /**
+     * Value change of a varible, made visible in a function with global
+     * should change the value in the global scope too
+     */
+    public function testVar7_ChangeValueGlobal() {
+        $argv[1] = self::srcPath.'testfile07.php';
+        require(self::cmdPath);
+        
+        $a = ScanInfo::findVar('$a');
+        $this->assertEquals(5, $a->getValue());
+    }
+    
+     /**
+     * Value change of a varible, made visible in a function with global
+     * should change the value in the global scope too
+     */
+    public function testVar8_GlobalUninitialisedVariable() {
+        $argv[1] = self::srcPath.'testfile08.php';
+        require(self::cmdPath);
+        
+        $a = ScanInfo::findVar('$a');
+        $this->assertEquals(false, $a);
+    }
+    
     public function testVar10_SimpleVulnerability() {
         $argv[1] = self::srcPath.'testfile10.php';
         require(self::cmdPath);
