@@ -27,7 +27,7 @@ class Obj_ControlStructure {
     
     /**
      * Paths this controlstructure has
-     * @var Obj_ControlstrcuturePath[]
+     * @var Obj_ControlstructurePath[]
      */
     protected $paths;
     

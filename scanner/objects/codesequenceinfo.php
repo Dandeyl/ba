@@ -10,12 +10,11 @@ abstract class Obj_CodeSequenceInfo {
     protected $phpparser_expr;
     
     
-    
     /**
      * Does this code sequence return a safe value? Safe values are booleans, integers and floats.
      * @var bool 
      */
-    protected $safe_return;
+    protected $return_type;
     
     /**
      * Can this function be executed without changing the environment. "Changing 
@@ -77,12 +76,15 @@ abstract class Obj_CodeSequenceInfo {
     
     
     
-    
-    public function setSafeReturn($safe_return) {
-        $this->safe_return = (bool) $safe_return;
+    /**
+     * Set the return type of this codesequence
+     * @param string $return_type
+     */
+    public function setReturnType($return_type) {
+        $this->return_type = (string) $return_type;
     }
     
-    public function getSafeReturn() {
-        
+    public function getReturnType() {
+        return $this->return_type;
     }
 }

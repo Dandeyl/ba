@@ -13,7 +13,13 @@ class Obj_Function {
     protected $name;
     
     /**
-     * Paramters of the current function
+     * Can this function be safely executed?
+     * @var bool 
+     */
+    protected $executable;
+    
+    /**
+     * Paramters of the current function.
      * @var PHPParser_Node_Param 
      */
     protected $parameters;
@@ -26,9 +32,15 @@ class Obj_Function {
     
     /**
      * The type of the value that gets returned
-     * @var bool 
+     * @var string
      */
     protected $return_type;
+    
+    /**
+     * Does the return value come from a source users can define?
+     * @var bool 
+     */
+    protected $return_user_defined;
     
     /**
      * The last value this function returned
@@ -43,59 +55,71 @@ class Obj_Function {
     protected $return_by_ref;
     
     /**
-     * Is the return value user defined?
-     * @var bool 
+     * Which parameters define the return value
+     * @var type 
      */
-    protected $return_user_defined;
-    
+    protected $return_defined_by_params;
+        
     /**
-     * Is this function defined by the user
+     * Is this function defined by the user?
      * @var bool 
      */
     protected $user_defined;
     
     /**
-     * Statements of this functions
+     * Statements of this functions. Only for user defined functions
      * @var array 
      */
     protected $stmts;
     
     /**
-     * Which vulnerabilities this functions protects from.
-     *   "sql_injection" => array(1) // the first parameter gets secured for sql injection
+     * Does the return value somehow get protected from any vulnerability by this function?
+     * @var string
+     */
+    protected $return_add_securing = null;
+    
+     /**
+     * Does the return value somehow remove a protection?
+     * @var string
+     */
+    protected $return_remove_securing = null;
+    
+    /**
+     * Vulnerabilities possible through this function. Possible values:
+     * xss, sql, dir, head, 
+     * @var string
+     */
+    protected $vulnerable_for = null;
+    
+    /**
+     * Parameters that are vulnerable. Empty array means all parameters are vulnerable.
+     * Null means no parameter is vulnerable 
      * @var array 
      */
-    protected $securing_for;
-    
-    /**
-     * Vulnerabilities and which parameters have to be checked:
-     *    "sql_injection" => array() // all parameters have to be checked for sql inj.
-     * @var array
-     */
-    protected $vulnerable_for;
-    
-    /**
-     * Can this function be safely executed?
-     * @var bool 
-     */
-    protected $executable;
+    protected $vulnerable_parameters = null;
     
     /**
      * Name of the functions to check if this function really is vulnerable. E.g.
      * preg_replace is just dangerous if the modifier "e" is passed. So we have to create a
      * function pluteus_check_vulnerable_preg_replace($search, $replace, $haystack) in which we
-     * check the value of $search. 
-     * If more than one function is given, all functions have to return false to signalise the
-     * function is secure.
-     * @var array[] 
+     * check the value of $search. If the given function returns true, this function is vulnerable.
+     * @var string
      */
     protected $func_check_vulnerable;
+    
+    /**
+     * Name of the function used to replace this function. If the function cannot be executed
+     * a function that does nearly the same but skips the dangours part can be set and then will
+     * be executed instead.
+     * @var string 
+     */
+    protected $func_replacement;
     
     /**
      * Name of the function to undo this function. This might be used in the future for
      * intelligently guessing environment variables that can be passed to the script
      * to accomplish an attack.
-     * @var type 
+     * @var string 
      */
     protected $func_complimentary;
     
@@ -147,6 +171,23 @@ class Obj_Function {
     
     public function getReturnType() {
         return $this->return_type;
+    }
+    
+    /**
+     * Set the parameters that are defining the return value. null if the return value
+     * is not dependend on the parameters given.
+     * @param array|null $params
+     */
+    public function setReturnDefinedByParams($params) {
+        $this->return_defined_by_params = $params;
+    }
+    
+    /**
+     * Get what parameters define the return value
+     * @return type
+     */
+    public function getReturnDefinedByParams() {
+        return $this->return_defined_by_params;
     }
     
     /**
@@ -207,35 +248,75 @@ class Obj_Function {
     
     /**
      * Set what attacks the code sequence is vulnerable for
-     * @param array $vuln_for
+     * @param string $vuln_for
      */
-    public function setVulnerableFor(array $vuln_for) {
+    public function setVulnerableFor($vuln_for) {
         $this->vulnerable_for = $vuln_for;
     }
     
     /**
      * Get what attacks the code sequence is vulnerable for
-     * @return array
+     * @return string
      */
     public function getVulnerableFor() {
         return $this->vulnerable_for;
     }
     
-    
     /**
-     * Sets what kind of attacks this code sequence is securing for.
-     * @param array $sec_for
+     * Set parameters that are vulnerable
+     * @param array $parameters
      */
-    public function setSecuringFor(array $sec_for) {
-        $this->securing_for = $sec_for;
+    public function setVulnerableParameters(array $parameters) {
+        $this->vulnerable_parameters = $parameters;
     }
     
     /**
-     * Get what attacks this code sequence is securing
+     * Parameters that are vulnerable
+     * @return array
+     */
+    public function getVulnerableParameters() {
+        return $this->vulnerable_parameters;
+    }
+    
+    /**
+     * Sets how this function is securing a value
+     * @param string $sec_for
+     */
+    public function setReturnAddSecuring($sec_for) {
+        $this->return_add_securing = $sec_for;
+    }
+    
+    /**
+     * Get how this function is securing a value
      * @param type $sec_for
      */
-    public function getSecuringFor() {
-        return $this->securing_for;
+    public function getReturnAddSecuring() {
+        return $this->return_add_securing;
+    }
+    
+    /**
+     * Sets if this function is removing a securing
+     * @param string $sec_for
+     */
+    public function setReturnRemoveSecuring($sec_for) {
+        $this->return_remove_securing = $sec_for;
+    }
+    
+    /**
+     * Get what securing mechanism this function is removing
+     * @param type $sec_for
+     */
+    public function getReturnRemoveSecuring() {
+        return $this->return_remove_securing;
+    }
+    
+    
+    public function setReturnUserDefined($user_defined) {
+        $this->return_user_defined = (int) $user_defined;
+    }
+    
+    public function getReturnUserDefined() {
+        return $this->return_user_defined;
     }
     
     public function setScope($scope) {
@@ -247,16 +328,20 @@ class Obj_Function {
         return $this->scope;
     }
     
-    public function setFunctionToCheckForVulnerability($functions) {
-        foreach($functions as $vuln => $funcs) {
-            foreach($funcs as $func) {
-                $this->addFunctionToCheckForVulnerability($vuln, $func);
-            }
-        }
+    public function setFunctionToCheckForVulnerability($function) {
+        $this->func_check_vulnerable = $function;
     }
     
-    public function addFunctionToCheckForVulnerability($vulnerability, $function) {
-        $this->func_check_vulnerable[$vulnerability][] = $function;
+    public function getFunctionToCheckForVulnerability() {
+        return $this->func_check_vulnerable;
+    }
+    
+    public function setFunctionReplacement($function) {
+        $this->func_replacement = $function;
+    }
+    
+    public function getFunctionReplacement() {
+        return $this->func_replacement;
     }
     
     public function setStatements(array $stmts) {

@@ -20,7 +20,7 @@ class Helper_ExpressionResolver {
         
         $resolved->setExecutable(false);
         $resolved->setExpression($expr);
-        $resolved->setSafeReturn(false);
+        $resolved->setReturnType(false);
         $resolved->setUserDefined(false);
         
         if($expr instanceof PHPParser_Node_Scalar) {
@@ -43,6 +43,11 @@ class Helper_ExpressionResolver {
         elseif($expr instanceof PHPParser_Node_Arg) {
             $this->resolveArg($expr);
         }
+        elseif($expr instanceof PHPParser_Node_Expr_BooleanNot) {
+            $resolve_expr = Helper_ExpressionResolver::resolve($expr->expr);
+            $resolved->setReturnType('bool');
+            $resolved->setValue(!((bool) $resolve_expr->getValue()));
+        }
         
         
         
@@ -56,7 +61,7 @@ class Helper_ExpressionResolver {
         $val = eval('return '.Scanner::prettyPrintExpr($expr).';');
         $this->obj_resolved->setValue($val);
         $this->obj_resolved->setExecutable(true);
-        $this->obj_resolved->setSafeReturn(true);
+        $this->obj_resolved->setReturnType(true);
     }
     
     /**
@@ -72,7 +77,7 @@ class Helper_ExpressionResolver {
             if($variable) {
                 /*@var $variable Obj_Variable */
                 $this->obj_resolved->setUserDefined($variable->isUserDefined());
-                $this->obj_resolved->setSecuredFor($variable->getSecuredFor());
+                $this->obj_resolved->setSecuredBy($variable->getSecuredBy());
                 $this->obj_resolved->setValue($variable->getValue());
                 $this->obj_resolved->setExecutable(false);
             }
@@ -96,7 +101,7 @@ class Helper_ExpressionResolver {
         $right = Helper_ExpressionResolver::resolve($expr->right);
         
         $this->obj_resolved->setExecutable($left->isExecutable() && $right->isExecutable());
-        $this->obj_resolved->setSafeReturn($left->getSafeReturn() && $right->getSafeReturn());
+        $this->obj_resolved->setReturnType($left->getReturnType() && $right->getReturnType());
         #$resolved->setSecuredFor(array());
         $this->obj_resolved->setUserDefined($left->isUserDefined() || $right->isUserDefined());
         
@@ -145,7 +150,7 @@ class Helper_ExpressionResolver {
         if($variable) {
             /*@var $variable Obj_Variable */
             $this->obj_resolved->setUserDefined($variable->isUserDefined());
-            $this->obj_resolved->setSecuredFor($variable->getSecuredFor());
+            $this->obj_resolved->setSecuredBy($variable->getSecuredBy());
             $this->obj_resolved->setValue($variable->getValue());
         }
         else {
@@ -192,30 +197,150 @@ class Helper_ExpressionResolver {
             return;
         }
         
-        // if it is a system function: execute it if it's safe, otherwise generate a random value
+        
+        // get information about the functions parameters
+        $resolved_arguments = array();
+        $values      = array();
+        $references  = array();
+        $resolve_err = false;
+        foreach($expr->args as $arg) {
+            $val = self::resolve($arg->value);
+            /*@var $val Obj_Resolved*/
+            
+            if(!$val->isResolveError()) {
+                $resolved_arguments[] = $val;
+                $values[]             = $val->getValue();
+                $references[]         = $arg->byRef; 
+            }
+            else {
+                $resolve_err = true;
+                throw new Exception("Helper_ExpressionResolver: Error resolving an argument occured!");
+            }
+        }
+        
+        // get parameters
+        $vulnerable = $this->getVulnerableParameters($func, $values);
+        
+        // if it is a system function: 
+        //     execute it if it's safe, otherwise generate a random value
         if(!$func->isUserDefined()) {
-            if($func->isExecutable()) {
-                $values     = array();
-                $references = array();
-                $error  = false;
-                
-                foreach($expr->args as $arg) {
-                    /*@var $val Obj_Resolved*/
-                    $val = self::resolve($arg->value);
-                    if($val->isResolveError()) {
-                        $error = true;
-                    }
-                    else {
-                        $values[]     = $val->getValue();
-                        $references[] = $arg->byRef; 
+            $data = array(
+                "vulnerable" => $vulnerable,
+                "resolved_arguments" => $resolved_arguments,
+                "values" => $values,
+                "references" => $references,
+                "expr" => $expr
+            );
+            $this->resolveExprFunctionCallSystemDefined($func, $data);
+        }
+    }
+    
+    /**
+     * Resolve function calls where functions are called, that are defined by php or extensions
+     */
+    protected function resolveExprFunctionCallSystemDefined(Obj_Function $func, array $data) {
+        extract($data);
+        
+        // user defined
+        $return_user_defined = 0;
+        foreach($resolved_arguments as $arg) {
+            if($arg->isUserDefined() === 1) {
+                $return_user_defined = 1;
+                break;
+            }
+            elseif($arg->isUserDefined() === 2) {
+                $return_user_defined = 2;
+            }
+        }
+        $this->obj_resolved->setUserDefined($return_user_defined);
+
+        // get securing from parameters
+        $param_indexes = $func->getReturnDefinedByParams();
+        if($param_indexes !== null) {
+            // if array is empty fill it with all arguments
+            if(count($param_indexes) == 0) {
+                $i = 1;
+                foreach($resolved_arguments as $arg) {
+                    $param_indexes[] = $i;
+                    $i++;
+                }
+            }
+
+            // check parameters
+            $securings = array();
+            $count_userdef_params = 0;
+            foreach($param_indexes as $index) {
+                if(!isset($resolved_arguments[($index-1)])) break;
+                $resolved = $resolved_arguments[($index-1)];
+                /* @var $resolved Obj_Resolved */
+                if($resolved->isUserDefined()) {
+                    $count_userdef_params++;
+                    foreach($resolved->getSecuredBy() as $mechanism) {
+                        isset($securings[$mechanism]) ? $securings[$mechanism]++ : $securings[$mechanism] = 1; 
                     }
                 }
-                if(!$error) {
-                    // Todo: Fine Tuning ^^
-                    $this->obj_resolved->setValue(call_user_func_array($name, $values));
+            }
+
+            foreach($securings as $mechanism => $count) {
+                if($count == $count_userdef_params) {
+                    $this->obj_resolved->addSecuredBy($mechanism);
                 }
             }
         }
+
+
+        // securing..
+        if(($securing = $func->getReturnAddSecuring()) != null) {
+            $this->obj_resolved->addSecuredBy($securing);
+        }
+
+        // unsecuring
+        if(($securing = $func->getReturnRemoveSecuring()) != null) {
+            $this->obj_resolved->removeSecuredBy($securing);
+        }
+
+        // return type
+        $this->obj_resolved->setReturnType($func->getReturnType());
+
+        // EXECUTE
+        if($func->isExecutable() && !$vulnerable) {
+            // Todo: Fine Tuning ^^
+            $this->obj_resolved->setValue(call_user_func_array($func->getName(), $values));
+        }
+        elseif(!$func->isExecutable() && !$vulnerable && $func->getFunctionReplacement()) {
+            $this->obj_resolved->setValue(call_user_func_array($func->getFunctionReplacement(), $values));
+        }
+
+        elseif($vulnerable) {
+            foreach($vulnerable as $argpos) {
+                $arg = $resolved_arguments[($argpos-1)];
+                if($arg->isUserDefined()) {
+                    ScanInfo::addVulnerability(Vulnerability::get($func->getVulnerableFor()), $expr);
+                }
+            }
+        }
+    }
+    
+    protected function getVulnerableParameters(Obj_Function $func, array $values) {
+        $return = false;
+        
+        // check if this function is vulnerable
+        if(($func_vulnerable = $func->getVulnerableFor()) != null) {
+            // vulnerable
+            $return = $func->getVulnerableParameters();
+
+            // are there functions to check if the function is vulnerable?
+            $vuln_func_name = $func->getFunctionToCheckForVulnerability();
+            if($vuln_func_name) {
+                $vulnerable = false;
+
+                if(call_user_func_array($vuln_func_name, $values)) {
+                    $vulnerable = $func->getVulnerableParameters();
+                }
+            }
+        }
+        
+        return $return;
     }
     
     /**
@@ -247,3 +372,6 @@ class Helper_ExpressionResolver {
     
     
 }
+
+
+class VulnerabilityException extends Exception{}

@@ -13,12 +13,13 @@
  */
 
 
-class NodeVisitor_Xss extends PHPParser_NodeVisitorAbstract
+class Attack_Xss
 {
     const STMT_ECHO  = 1;
     const EXPR_PRINT = 2;
     const EXPR_EXIT  = 3;
     const EXPR_FUNC  = 4;
+    
 
    /**
      * Checks if the passed node is a function or language construct, that is xss vulnerable
@@ -26,7 +27,7 @@ class NodeVisitor_Xss extends PHPParser_NodeVisitorAbstract
      * @return int||false The arguments that have to be checked for user input.\
      *         If an empty array gets returned all arguments have to be checked, 
      */
-    protected function isXssFunction(PHPParser_Node $node) {
+    public static function isXssFunction(PHPParser_Node $node) {
         // echo
         if($node instanceof PHPParser_Node_Stmt_Echo) {
             // all arguments are vulnerable
@@ -63,28 +64,21 @@ class NodeVisitor_Xss extends PHPParser_NodeVisitorAbstract
     }
     
     
-    public function leaveNode(PHPParser_Node $node) {
-        $vulnerable = $this->isXssFunction($node);
-        
-        // no vulnerable node, do nothing
-        if($vulnerable === false) {
-            return null;
-        }
-        
+    public static function checkNode(PHPParser_Node $node, $function) {
         // vulnerable function or statement found
-        switch($vulnerable) {
+        switch($function) {
             case self::STMT_ECHO:
-                $this->checkEcho($node);
+                self::checkEcho($node);
                 break;
             case self::EXPR_PRINT:
-                $this->checkPrint($node);
+                self::checkPrint($node);
                 break;
             case self::EXPR_EXIT:
-                $this->checkExit($node);
+                self::checkExit($node);
                 break;
             default: // function
-                if($vulnerable instanceof Obj_Function) {
-                    $this->checkFunction($vulnerable, $node);
+                if($function instanceof Obj_Function) {
+                    self::checkFunction($function, $node);
                 }
                 break;
         }
@@ -95,11 +89,11 @@ class NodeVisitor_Xss extends PHPParser_NodeVisitorAbstract
      * Checks all expressions following the echo language construct
      * @param PHPParser_Node $node
      */
-    public function checkEcho(PHPParser_Node $node) {
+    public static function checkEcho(PHPParser_Node $node) {
         foreach($node->exprs as $expr) {
             $resolved = Helper_ExpressionResolver::resolve($expr);
-            if($resolved->isUserDefined() && !$resolved->isSecuredFor('xss')) {
-                ScanInfo::addVulnerability('xss', $node, ScanInfo::getCurrentFilePath(), ScanInfo::getCurrentFileLine());
+            if(self::checkXssCondition($resolved)) {
+                ScanInfo::addVulnerability(Vulnerability::Xss, $node, ScanInfo::getCurrentFilePath(), ScanInfo::getCurrentFileLine());
                 break;
             }
         }
@@ -109,11 +103,29 @@ class NodeVisitor_Xss extends PHPParser_NodeVisitorAbstract
      * Checks the expression following the print language construct
      * @param PHPParser_Node $node
      */
-    public function checkPrint(PHPParser_Node $node) {
+    public static function checkPrint(PHPParser_Node $node) {
         $resolved = Helper_ExpressionResolver::resolve($node->expr);
         
-        if($resolved->isUserDefined() && !$resolved->isSecuredFor('xss')) {
-            ScanInfo::addVulnerability('xss', $node, ScanInfo::getCurrentFilePath(), ScanInfo::getCurrentFilePath());
+        if(self::checkXssCondition($resolved)) 
+        {
+            ScanInfo::addVulnerability(Vulnerability::Xss, $node, ScanInfo::getCurrentFilePath(), ScanInfo::getCurrentFilePath());
         }
+    }
+    
+    /**
+     * Return if all conditions required for a possible xss condition are met
+     * @param Obj_Resolved $resolved
+     */
+    protected static function checkXssCondition(Obj_Resolved $resolved) {
+        if($resolved->isUserDefined() 
+           && !(   $resolved->isSecuredBy(Securing::SpecialCharsEncode)
+                || $resolved->isSecuredBy(Securing::StripTags)
+                || $resolved->isSecuredBy(Securing::Base64Encode))
+           && !in_array($resolved->getReturnType(), array('bool', 'integer', 'float'))
+        )  {
+            return true;
+        }
+        
+        return false;
     }
 }

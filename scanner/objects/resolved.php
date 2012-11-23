@@ -16,10 +16,10 @@ class Obj_Resolved extends Obj_CodeSequenceInfo {
     protected $user_defined = false;
     
     /**
-     * For which attacks this
-     * @var type 
+     * By what mechanics it is resolved
+     * @var array 
      */
-    protected $secured_for = array();
+    protected $secured_by = array();
     
     /**
      * Did an error occur resolving the function? E.g. a function that is not executable
@@ -44,12 +44,15 @@ class Obj_Resolved extends Obj_CodeSequenceInfo {
         return $this->value;
     }
     
-    
+    /**
+     * Is this expression userdefined
+     * @param type $userdefined
+     */
     public function setUserDefined($userdefined) {
-        $this->user_defined = (bool) $userdefined;
+        $this->user_defined = (int) $userdefined;
     }
     public function isUserDefined() {
-        return (bool) $this->user_defined;
+        return $this->user_defined;
     }
     
     
@@ -58,66 +61,68 @@ class Obj_Resolved extends Obj_CodeSequenceInfo {
     
     
     /**
-     * Set the attack types this expression is secured for
+     * Set the mechanisms this expression is secured by
      * @return array
      */
-    public function setSecuredFor($secured_for) {
-        if(is_array($secured_for)) {
-            $this->secured_for = $secured_for;
+    public function setSecuredBy($secured_by) {
+        if(is_array($secured_by)) {
+            $this->secured_by = $secured_by;
         }
-        elseif(is_string($secured_for)) {
-            $this->secured_for = array($secured_for);
+        elseif(is_string($secured_by)) {
+            $this->secured_by = array($secured_by);
         }
         else {
-            throw new Exception("Obj_Resolved: Ungültiger Wert bei setSecuredFor: ".var_export($secured_for, true));
+            throw new Exception("Obj_Resolved: Ungültiger Wert bei setSecuredFor: ".var_export($secured_by, true));
         }
     }
     
     /**
-     * Adds an attack type this expression is secured for
-     * @param string $secured_for
+     * Adds an mechanism this expression is secured by
+     * @param string $mechanism
      */
-    public function addSecuredFor($secured_for) {
-        if(!is_string($secured_for)) {
-            throw new Exception("Obj_Resolved: Ungültiger Wert bei addSecuredFor: ".var_export($secured_for, true));
+    public function addSecuredBy($mechanism) {
+        if(!is_string($mechanism)) {
+            throw new Exception("Obj_Resolved: Ungültiger Wert bei addSecuredFor: ".var_export($mechanism, true));
         }
         
-        if(!in_array($secured_for, $this->secured_for)) {
-            $this->secured_for[] = $secured_for;
+        if($mechanism == Securing::NotUserDefined) {
+            $this->setUserDefined(false);
+        }
+        else {
+            $this->secured_by[] = $mechanism;
         }
     }
     
-    
     /**
-     * Removes an attack type this expression is secured for
-     * @param string $secured_for
+     * Removes an mechanism this expression is secured by
+     * @param string $mechanism
      */
-    public function removeSecuredFor($secured_for) {
-        if(!is_string($secured_for)) {
-            throw new Exception("Obj_Resolved: Ungültiger Wert bei addSecuredFor: ".var_export($secured_for, true));
+    public function removeSecuredBy($mechanism) {
+        if(!is_string($mechanism)) {
+            throw new Exception("Obj_Resolved: Ungültiger Wert bei addSecuredFor: ".var_export($mechanism, true));
         }
         
-        $key = array_search($secured_for, $this->secured_for);
+        $key = array_search($mechanism, $this->secured_by);
         if($key !== false) {
-            unset($this->secured_for[$key]);
+            unset($this->secured_by[$key]);
         }
     }
     
     /**
-     * Get the attack types this expression is secured for
+     * Get the mechanisms this expression is secured by
      * @return array
      */
-    public function getSecuredFor() {
-        return (array) $this->secured_for;
+    public function getSecuredBy() {
+        return (array) $this->secured_by;
     }
     
     /**
-     * Returns if the the resolved expression was secured for a specific attack.
-     * @param string $attack
+     * Returns if the the resolved expression was secured by a specific mechanism.
+     * @param string $mechanism
      * @return bool
      */
-    public function isSecuredFor($attack) {
-        return in_array($attack, $this->secured_for);
+    public function isSecuredBy($mechanism) {
+        return in_array($mechanism, $this->secured_by);
     }
     
     /**

@@ -58,8 +58,17 @@ class Obj_Variable {
     protected $reference_to;
     
     /**
+     * Child elements, needed for arrays
+     * @var Obj_Variable 
+     */
+    protected $child_elements;
+    
+    /**
      * Can the user define the content of this variable. => INSECURE
-     * @var bool
+     * 0 => user can't define the content at all
+     * 1 => user can directly define it using GET or POST
+     * 2 => content comes from file or db
+     * @var int
      */
     protected $user_defined;
     
@@ -67,7 +76,7 @@ class Obj_Variable {
      * For which attacks this variable got secured.
      * @var array
      */
-    protected $secured_for;
+    protected $secured_by;
     
     /**
      * If the variable gets overwritten the old version will be stored here.
@@ -89,7 +98,7 @@ class Obj_Variable {
         $this->value = null;
         $this->type  = 'null';
         $this->static = false;
-        $this->secured_for  = array();
+        $this->secured_by  = array();
         $this->user_defined = false;
         $this->reference_to = &$this;
         $this->history = array();
@@ -255,7 +264,10 @@ class Obj_Variable {
         }
         
         $this->getReferenceTo()->value = $newval;
-        $this->getReferenceTo()->type  = gettype($newval); 
+        
+        if(gettype($newval) !== null) {
+            $this->getReferenceTo()->type  = gettype($newval);
+        }
     }
     
     
@@ -269,16 +281,19 @@ class Obj_Variable {
     }
     
     /**
-     * Set if the variable is user defined
-     * @param bool $userdefined
+     * Set if the variable is user defined. 
+     * 0 or false: not user defined
+     * 1 or true: user defined and comes from source user can manipulate directly, such as GET or POST
+     * 2: comes from file
+     * @param int $userdefined
      */
     public function setUserDefined($userdefined) {
-        $this->getReferenceTo()->user_defined = (bool) $userdefined;
+        $this->getReferenceTo()->user_defined = (int) $userdefined;
     }
     
     /**
      * Get if the variable is user defined
-     * @return type
+     * @return int
      */
     public function isUserDefined() {
         return $this->getReferenceTo()->user_defined; 
@@ -295,17 +310,17 @@ class Obj_Variable {
     }
     
     // is secured
-    public function setSecureFor(array $secured_for) {
-        $this->getReferenceTo()->secured_for = $secured_for;
+    public function setSecuredBy(array $secured_for) {
+        $this->getReferenceTo()->secured_by = $secured_for;
     }
-    public function isSecuredFor($attack) {
-        if(in_array($attack, $this->getReferenceTo()->secured_for)) {
+    public function isSecuredBy($mechanism) {
+        if(in_array($mechanism, $this->getReferenceTo()->secured_by)) {
             return true;
         }
         return false;
     }
-    public function getSecuredFor() {
-        return $this->getReferenceTo()->secured_for;
+    public function getSecuredBy() {
+        return $this->getReferenceTo()->secured_by;
     }
     
    
@@ -329,7 +344,6 @@ class Obj_Variable {
         $this->history = $obj;
     }
 
-
     
     /**
      * Returns the former representations of this variable 
@@ -337,5 +351,9 @@ class Obj_Variable {
      */
     public function getHistory() {
         return $this->getReferenceTo()->history;
+    }
+    
+    public function addChildElement($key=null, Obj_Variable $var) {
+        
     }
 }

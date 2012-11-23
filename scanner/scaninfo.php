@@ -163,6 +163,9 @@ abstract class ScanInfo {
                     Scanner::walkFile($file, $skipwalker);
                 }
             }
+            else {
+                $breakpoint = true;
+            }
         }
     }
     
@@ -217,15 +220,24 @@ abstract class ScanInfo {
      * @param string $name
      * @return &Obj_Variable|false
      */
-    public static function findVar($name) {
+    public static function findVar($name, $scope=null) {
+        // looking for $GLOBALS
         if(substr($name, 0, 8) == '$GLOBALS') {
             $scope_backup = self::$varlist->getScope();
-            $global_name  = substr($name, 9, -1);
+            $global_name  = substr($name, 9, -1); // name of variable in global scope $GLOBALS[test] -> $test
             
             self::$varlist->setScope("");
             $var = self::$varlist->find($global_name);
             self::$varlist->setScope($scope_backup);
             
+            return $var;
+        }
+        // scope was set
+        elseif($scope !== null) {
+            $scope_backup = self::$varlist->getScope();
+            self::$varlist->setScope($scope);
+            $var = self::$varlist->find($name);
+            self::$varlist->setScope($scope_backup);
             return $var;
         }
         

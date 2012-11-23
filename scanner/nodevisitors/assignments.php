@@ -25,7 +25,16 @@ class NodeVisitor_Assignments extends PHPParser_NodeVisitorAbstract
         }
         // array
         elseif($assignment_target == Assignment::TargetArray) {
-            $this->resolveArray($node);
+            return $this->resolveArray($node);
+        }
+        // define() and const
+        elseif($assignment_target == Assignment::TargetConstant) {
+            if($assignment_type == Assignment::FuncDefine) {
+                return $this->resolveDefinition($node);
+            }
+            elseif($assignment_type == Assignment::Constant) {
+                return $this->resolveConst($node);
+            }
         }
         
     }
@@ -113,9 +122,11 @@ class NodeVisitor_Assignments extends PHPParser_NodeVisitorAbstract
                 return Assignment::TargetConstant;
             }
         }
-        
+        elseif($assignment_type == Assignment::Constant) {
+            return Assignment::TargetConstant;
+        }
         // class name { const Bla = ... }
-        else if($assignment == Assignment::ClassConstant) {
+        else if($assignment_type == Assignment::ClassConstant) {
             return Assignment::TargetClassConstant;
         }
         
@@ -135,6 +146,11 @@ class NodeVisitor_Assignments extends PHPParser_NodeVisitorAbstract
     private function isValidName($name, $type) {
         if($type == Assignment::TargetVariable) {
             if(preg_match('/^\$[a-z_][a-z0-9_]*?$/i', $name)) {
+                return true;
+            }
+        }
+        elseif($type == Assignment::TargetConstant) {
+            if(preg_match('/^[a-z_][a-z0-9_]*?$/i', $name)) {
                 return true;
             }
         }
@@ -193,7 +209,7 @@ class NodeVisitor_Assignments extends PHPParser_NodeVisitorAbstract
     private function addVariable($name, Obj_Resolved $resolved, $assignment_type, $node) {
         $vari = new Obj_Variable($name);
         $vari->setScope(ScanInfo::getScope());
-        $vari->setSecureFor($resolved->getSecuredFor());
+        $vari->setSecuredBy($resolved->getSecuredBy());
         $vari->setAssignmentNode($node);
         
         if($assignment_type == Assignment::AssignConcat) {
@@ -244,7 +260,87 @@ class NodeVisitor_Assignments extends PHPParser_NodeVisitorAbstract
     
     
     
+    ////////////////////////////////////////////////////////////////
+    ///   Constant
+    ////////////////////////////////////////////////////////////////
     
+    /**
+     * Get name and content of the constant defined by define.
+     * @param PHPParser_Node $node
+     * @return type
+     * @throws Exception
+     */
+    private function resolveDefinition(PHPParser_Node $node) {
+        // get resolved name
+        $name   = Helper_ExpressionResolver::resolve($node->args[0]->value)->getValue();
+        
+        // check resolved name
+        if(!$this->isValidName($name, Assignment::TargetConstant)) {
+            if($name == false) {
+                // could not resolve variable name
+                throw new Exception("NodeVisitor_Assignment: Can't resolve variable name");
+            }
+            else {
+                // could not resolve variable name
+                throw new Exception("NodeVisitor_Assignment: Variable name is not valid.");
+            }
+            return;
+        }
+        
+        // Value assignment
+        $resolve = Helper_ExpressionResolver::resolve($node->args[1]->value);
+        $this->addConstant($name, $resolve, $node);
+        
+        return $node->args[0]->value;
+    }
     
-      
+    /**
+     * Get name and content of the constant defined by const.
+     * @param PHPParser_Node $node
+     * @return type
+     * @throws Exception
+     */
+    private function resolveConst(PHPParser_Node $node) {
+        foreach($node->consts as $const) {
+            // get resolved name
+            $name   = Helper_NameResolver::resolve($const);
+
+            // check resolved name
+            if(!$this->isValidName($name, Assignment::TargetConstant)) {
+                if($name == false) {
+                    // could not resolve variable name
+                    throw new Exception("NodeVisitor_Assignment: Can't resolve constant name");
+                }
+                else {
+                    // could not resolve variable name
+                    throw new Exception("NodeVisitor_Assignment: Constant name is not valid.");
+                }
+                return;
+            }
+
+            // Value assignment
+            $resolve = Helper_ExpressionResolver::resolve($const->value);
+            $this->addConstant($name, $resolve, $node);
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Adds a constant to the varlist.
+     * @param string $name
+     * @param Obj_Resolved $resolved
+     * @param int $assignment_type
+     * @param PHPParser_Node $node
+     */
+    private function addConstant($name, Obj_Resolved $resolved, $node) {
+        $vari = new Obj_Variable($name);
+        $vari->setSuperGlobal(true);
+        $vari->setSecuredBy($resolved->getSecuredBy());
+        $vari->setAssignmentNode($node);
+        $vari->setUserDefined($resolved->isUserDefined());
+        $vari->setValue($resolved->getValue());
+        
+        ScanInfo::addVar($vari);
+    }
 }

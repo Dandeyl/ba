@@ -25,16 +25,14 @@ class Helper_ControlStructureResolver {
     protected function resolveIfStmt() {
         $node = $this->struct->getNode();
         $this->struct->setType(Obj_ControlStructure::STMT_IF);
-        $paths      = array();
         $conditions = &$this->conditions;
         
-        // ----  IF                                                                  merge condition and stmts (
+        // ----  IF                                               merge condition and stmts (
         $conditions[] = $node->cond;
         // check if condition is always true
         if($this->addPathInIfStmt(Obj_ControlStructure::STMT_IF, $node->cond, $node->stmts) === true) {
             return;
         }
-        
         
         /*if(!$resolve->isUserDefined() 
            && ((bool) $resolve->getValue()) === false) {

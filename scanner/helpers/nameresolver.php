@@ -68,8 +68,7 @@ class Helper_NameResolver {
         
         // function
         elseif($var->name instanceof PHPParser_Node_Expr_FuncCall) {
-            $name = self::resolveRecursive($var->name); 
-            return self::$functions->findFunction($name)->getValue();
+            return Helper_ExpressionResolver::resolve($var->name)->getValue(); 
         }
         
         // error

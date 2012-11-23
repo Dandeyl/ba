@@ -61,7 +61,7 @@ class Obj_Variable {
      * For which attacks this variable got secured.
      * @var array
      */
-    protected $secured_for;
+    protected $secured_by;
     
     /**
      * If the variable gets overwritten the old version will be stored here.
@@ -283,16 +283,16 @@ class Obj_Variable {
     }
     
     // is secured
-    public function setSecureFor(array $secured_for) {
+    public function setSecuredBy(array $secured_for) {
         $this->getReferenceTo()->secured_for = $secured_for;
     }
-    public function isSecuredFor($attack) {
+    public function isSecuredBy($attack) {
         if(in_array($attack, $this->getReferenceTo()->secured_for)) {
             return true;
         }
         return false;
     }
-    public function getSecuredFor() {
+    public function getSecuredBy() {
         return $this->getReferenceTo()->secured_for;
     }
     

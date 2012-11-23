@@ -61,6 +61,12 @@ abstract class Scanner {
             case 'Assignment':
                 require(dirname(__FILE__).'/definitions/assignment.php');
                 break;
+            case 'Securing':
+                require(dirname(__FILE__).'/definitions/securing.php');
+                break;
+            case 'Vulnerability':
+                require(dirname(__FILE__).'/definitions/vulnerability.php');
+                break;
             case 'PHPParser_NodeVisitorAbstract':
                 require(dirname(__FILE__).'/../parser/PHPParser/NodeVisitorAbstract.php');
                 break;
@@ -69,10 +75,13 @@ abstract class Scanner {
         if(substr($class_name, 0, 12) == 'NodeVisitor_') {
             include(dirname(__FILE__).'/nodevisitors/'.strtolower(substr($class_name, 12)).'.php');
         }
-        if(substr($class_name, 0, 7) == 'Helper_') {
+        elseif(substr($class_name, 0, 7) == 'Attack_') {
+            include(dirname(__FILE__).'/nodevisitors/attack/'.strtolower(substr($class_name, 7)).'.php');
+        }
+        elseif(substr($class_name, 0, 7) == 'Helper_') {
             include(dirname(__FILE__).'/helpers/'.strtolower(substr($class_name, 7)).'.php');
         }
-        if(substr($class_name, 0, 4) == 'Obj_') {
+        elseif(substr($class_name, 0, 4) == 'Obj_') {
             include(dirname(__FILE__).'/objects/'.strtolower(substr($class_name, 4)).'.php');
         }
     }
@@ -83,6 +92,7 @@ abstract class Scanner {
     public static function init() {
         // -- autoloader
         spl_autoload_register(array("self", "scanner_autoload"));
+        include(dirname(__FILE__).'/function_replacements/functions.php');
         
         // -- parser
         self::$parser   = new PHPParser_Parser(new PHPParser_Lexer);
@@ -94,10 +104,10 @@ abstract class Scanner {
         $traverser->addVisitor(new NodeVisitor_QualifiedNameResolver);
         $traverser->addVisitor(new NodeVisitor_Scope);
         $traverser->addVisitor(new NodeVisitor_Include);
-        $traverser->addVisitor(new NodeVisitor_Function);
+        //$traverser->addVisitor(new NodeVisitor_Function);
         $traverser->addVisitor(new NodeVisitor_Assignments);
         $traverser->addVisitor(new NodeVisitor_ControlStructure);
-        $traverser->addVisitor(new NodeVisitor_Xss);
+        $traverser->addVisitor(new NodeVisitor_FuncCall);
         self::$traverser = $traverser;
         
                
