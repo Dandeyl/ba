@@ -62,6 +62,7 @@ class NodeVisitor_WalkTo extends PHPParser_NodeVisitorAbstract {
                 $file = $this->next_include_file->path;
                 $this->next_include_file = array_shift($this->include_files);
                 Scanner::walkFile($file, $this);
+                Scanner::scanFile($file);
             }
         }
         

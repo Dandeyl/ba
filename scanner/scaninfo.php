@@ -359,6 +359,14 @@ abstract class ScanInfo {
     }
     
     /**
+     * Returns list of vulnerabilities
+     * @return type
+     */
+    public static function getVulnerabilityList() {
+        return self::$vulnerabilitylist;
+    }
+    
+    /**
      * Adds a warning to the scaninfo. Warnings can lead to a vulnerability
      * @param int $type
      * @param string $file
@@ -404,9 +412,7 @@ abstract class ScanInfo {
         return serialize($exp);
     }
     
-    public static function exportVulnerabilityList() {
-        return serialize(self::$vulnerabilitylist);
-    }
+    
     
     public static function importScanData($export) {
         $export = unserialize($export);

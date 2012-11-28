@@ -23,13 +23,15 @@ require (dirname(__FILE__).'/parser/bootstrap.php');
 require (dirname(__FILE__).'/scanner/bootstrap.php');
 
 // register subscriber
-subscribe('beginParseFile', function($event, $file) {
-    echo "\n--------- Parsing FILE: $file ---------\n\n\n"; 
-});
-subscribe('parseError', function($event, $file, $message) {
-    die('Parse error: '.$message."\n\n");
-});
-
+if($argc > 0) {
+    subscribe('beginParseFile', function($event, $file) {
+        static $count = 0;
+        echo "\n--------- ".++$count." Parsing FILE: $file ---------\n\n\n"; 
+    });
+    subscribe('parseError', function($event, $file, $message) {
+        die('Parse error: '.$message."\n\n");
+    });
+}
 
 
 // prepare file
@@ -43,7 +45,7 @@ if(!file_exists($file)) {
 }
 
 // start parsing and scanning
-Scanner::scanFile($file);
+Scanner::startScan($file);
 
 
 // dump information when scanning is done

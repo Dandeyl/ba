@@ -3,17 +3,22 @@ require dirname(__FILE__).'/../parser/bootstrap.php';
 require dirname(__FILE__).'/../scanner/bootstrap.php';
 
 $scan_result = '';
-$info_file = dirname(__FILE__).'/../tmp/scaninfo.php';
+$result_file = dirname(__FILE__).'/../tmp/scanresult.php';
 
-$vulnlist = unserialize(file_get_contents($info_file));
+$result   = unserialize(file_get_contents($result_file));
 
-foreach($vulnlist->getVulnerabilities() as $vulnerability) {
-    $scan_result .= '<pre class="brush: php; first-line: '.$vulnerability->getLine().';toolbar: false;" 
-                          title="<button class=\'btn btn-mini\'>Show details</button> <strong>'.$vulnerability->getFile().':</strong> <span class=\'label\'>'.$vulnerability->getType().'</span> on line '.$vulnerability->getLine().'.">
-'.Scanner::printNode($vulnerability->getNode()).'
-</pre><p>&nbsp;</p>';
+if(isset($result['parseError'])) {
+    $scan_result = '<div class="alert alert-error">'.$result['parseError'].'</div>';
 }
-
+else {
+    $vulnlist = $result["vulnList"];
+    foreach($vulnlist->getVulnerabilities() as $vulnerability) {
+        $scan_result .= '<pre class="brush: php; first-line: '.$vulnerability->getLine().';toolbar: false;" 
+                              title="<button class=\'btn btn-mini\'>Show details</button> <strong>'.$vulnerability->getFile().':</strong> <span class=\'label\'>'.$vulnerability->getType().'</span> on line '.$vulnerability->getLine().'.">
+    '.Scanner::printNode($vulnerability->getNode()).'
+    </pre><p>&nbsp;</p>';
+    }
+}
 
 ?>
 <!doctype html>
@@ -45,8 +50,6 @@ foreach($vulnlist->getVulnerabilities() as $vulnerability) {
        chromium.org/developers/how-tos/chrome-frame-getting-started -->
   <!--[if lt IE 8]><p class=chromeframe>Your browser is <em>ancient!</em> <a href="http://browsehappy.com/">Upgrade to a different browser</a> or <a href="http://www.google.com/chromeframe/?redirect=true">install Google Chrome Frame</a> to experience this site.</p><![endif]-->
 <!--! END KICKSTRAP HEADER --> 
-
-
 
 
 
@@ -84,13 +87,13 @@ require("menu.php");
                                                     <!-- Begin navbar -->
                                                     <div class="navbar">
                                                         <div class="navbar-inner">
-                                                            <ul class="nav">
+                                                            <!--<ul class="nav">
                                                                 <li class="active">
                                                                     <a href="#">Home</a>
                                                                 </li>
                                                                 <li><a href="#">Link</a></li>
                                                                 <li><a href="#">Link</a></li>
-                                                            </ul>
+                                                            </ul>-->
                                                             
                                                             <ul class="nav pull-right">
                                                                 <li class="dropdown">

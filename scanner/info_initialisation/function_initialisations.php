@@ -90,6 +90,9 @@ function funcini_return_source($source) {
         case 'os':
         case 'system':
             return 2;
+        case 'res':
+        case 'resource':
+            return 3;
     }
 }
 

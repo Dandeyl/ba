@@ -1,4 +1,5 @@
 var timer;
+var timer_duration = 110;
 var redirect_url = 'scan_results.php'; // redirect to this page after scanning is completed
 
 /* 
@@ -8,7 +9,12 @@ var redirect_url = 'scan_results.php'; // redirect to this page after scanning i
 $(document).ready(function() {
     // direct input file
     $('#btn_scan-direct').click(function() {
-        initScanning(null, editor.getValue());
+        var val = editor.getValue();
+        if(!val) {
+            alert("Please enter code to be scanned");
+            return false;
+        }
+        initScanning(null, val);
         return false;
     });
     
@@ -77,7 +83,7 @@ function startScanning(data) {
  * Check if the scanning process is already finished and update visible scanning information
  **/
 $(document).live("scanning-in-progress", function() {
-    timer = window.setInterval(checkScanEnd,100);
+    timer = window.setTimeout(checkScanEnd,timer_duration);
     
     // open modal dialog
     window.setTimeout(function() {
@@ -87,12 +93,14 @@ $(document).live("scanning-in-progress", function() {
 
 function checkScanEnd() {
     $.ajax({
-        url: '../tmp/scaninfo.php',
+        url: '../tmp/scanresult.php',
         success: function(data) {
           document.location.href = redirect_url;
         },
         statusCode: {
             404: function() {
+                timer_duration *= 2;
+                timer = window.setTimeout(checkScanEnd,timer_duration);
             }
         }
     });

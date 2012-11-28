@@ -84,7 +84,8 @@ class Helper_ControlStructureResolver {
             return false;
         }
         else {
-            $struct_path  = new Obj_ControlStructurePath($path_type, array_merge($this->conditions, $stmts));
+            $struct_path  = new Obj_ControlStructurePath($path_type, $stmts); // TODO:
+            //$struct_path  = new Obj_ControlStructurePath($path_type, array_merge($this->conditions, $stmts));
             $struct_path->setCond($condition);
             
             if($resolve->isUserDefined()) {
@@ -118,6 +119,24 @@ class Helper_ControlStructureResolver {
         $this->struct->setPaths($paths);
     }
     
+    protected function resolveLogicalOrExpr() {
+        $node = $this->struct->getNode();
+        $this->struct->setType(Obj_ControlStructure::EXPR_LOGICAL_OR);
+        
+        $paths = array();
+        
+        // left
+        $struct_path  = new Obj_ControlStructurePath(Obj_ControlStructure::EXPR_LOGICAL_OR, array($node->left));
+        $paths[] = $struct_path; 
+        
+        // right
+        $struct_path = new Obj_ControlStructurePath(Obj_ControlStructure::EXPR_LOGICAL_OR, array($node->right));
+        $paths[] = $struct_path;
+        
+        $this->struct->setPaths($paths);
+    }
+    
+    
     protected function getStruct() {
         return $this->struct;
         if($test == $test) {if($test == $test) {  echo "j";} echo "lo";}
@@ -137,6 +156,12 @@ class Helper_ControlStructureResolver {
     public static function resolveTernary(PHPParser_Node_Expr_Ternary $node) {
         $hlper = new Helper_ControlStructureResolver($node);
         $hlper->resolveTernaryExpr();
+        return $hlper->getStruct();
+    }
+    
+    public static function resolveLogicalOr(PHPParser_Node_Expr_LogicalOr $node) {
+        $hlper = new Helper_ControlStructureResolver($node);
+        $hlper->resolveLogicalOrExpr();
         return $hlper->getStruct();
     }
 }

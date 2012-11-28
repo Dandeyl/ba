@@ -49,16 +49,11 @@ abstract class Scanner {
     protected static $state_exiting = false;
     
     /**
-     * Scan ended but there might be paths left to go.
+     * Scan ended completely
      * @var type 
      */
     protected static $state_endofscan = false;
     
-    /**
-     * Scan fully completed
-     * @var type 
-     */
-    protected static $state_scancomplete = false;
     
     
     
@@ -183,6 +178,10 @@ abstract class Scanner {
                     Scanner::walkFile($file, $skipwalker);
                 }
             }
+            
+            if(empty($control_structs)) {
+                self::$state_endofscan = true;
+            }
         });
     }
     
@@ -218,6 +217,59 @@ abstract class Scanner {
         return false;
     }
     
+    
+    
+    
+    
+    
+    public static function startScan($start_file) {
+        // get real file path
+        if(!$file = self::getFileLocation($start_file)) {
+            return false;
+        }
+        // add file to filetree
+        ScanInfo::addFile($file, null);
+        
+        
+        $parser = self::$parser;
+        $traverser = self::$traverser;
+        $nodeDumper = self::$dumper;
+        
+        do {
+            // execute parsing and traversing
+            try {
+                // parse
+                fire('beginParseFile', array($file));
+                $stmts = $parser->parse(ScanInfo::getCurrentFileContent());
+                fire('endParseFile', array($file, $stmts));
+
+
+                // just dump the parsed file
+                if(SCANNER_DUMP_TREE) {
+                    echo ($nodeDumper->dump($stmts))."\n\n\n";
+                }
+                else {
+                    // Scan File
+                    fire('beginScanFile', array($file));
+                    $traverser->traverse($stmts);
+                    //echo "\n\n".$nodeDumper->dump($stmts)."\n\n\n";
+                    fire('endScanFile', array($file));
+
+                }
+            } 
+            catch (PHPParser_Error $e) {
+                fire('parseError', array($file, $e->getMessage()));
+            }
+
+            fire('endOfRun');
+        } while(!self::$state_endofscan);
+        
+        // scan complete
+        fire('endOfScan');
+    }
+    
+    
+    
     /**
      * Does not scan the file if it has been scanned already. Needed for include_once()
      * and require_once().
@@ -240,14 +292,16 @@ abstract class Scanner {
      */
     public static function scanFile($rel_file, $node=null) {
         // get real file path
-        if(!$file = self::getFileLocation($rel_file)) {
-            ScanInfo::addFailedInclude(new Obj_FailedInclude($node)  );
-            return false;
+        if($rel_file) {
+            if(!$file = self::getFileLocation($rel_file)) {
+                ScanInfo::addFailedInclude(new Obj_FailedInclude($node)  );
+                return false;
+            }
+
+            // add file to filetree
+            ScanInfo::addFile($file, $node);
         }
-        
-        // add file to filetree
-        ScanInfo::addFile($file, $node);
-        
+
         $parser = self::$parser;
         $traverser = self::$traverser;
         $nodeDumper = self::$dumper;
@@ -258,8 +312,8 @@ abstract class Scanner {
             fire('beginParseFile', array($file));
             $stmts = $parser->parse(ScanInfo::getCurrentFileContent());
             fire('endParseFile', array($file, $stmts));
-            
-            
+
+
             // just dump the parsed file
             if(SCANNER_DUMP_TREE) {
                 echo ($nodeDumper->dump($stmts))."\n\n\n";
@@ -269,14 +323,13 @@ abstract class Scanner {
                 fire('beginScanFile', array($file));
                 $traverser->traverse($stmts);
                 fire('endScanFile', array($file));
-                
-                echo ($nodeDumper->dump($stmts))."\n\n\n";
+
             }
         } 
         catch (PHPParser_Error $e) {
             fire('parseError', array($file, $e->getMessage()));
         }
-        
+
         fire('endOfRun');
     }
     
@@ -292,7 +345,6 @@ abstract class Scanner {
             self::$state_exiting = $exit ? true : false;
             
         }
-            
     }
     
     
@@ -308,18 +360,6 @@ abstract class Scanner {
         $traverser = self::$traverser;
         $idx = $traverser->addVisitor($nodevisitor);
         $traverser->setActiveVisitors(array(0,1,$idx));
-
-        // execute parsing and traversing
-        try {
-            // parse
-            $stmts = $parser->parse(file_get_contents($file));
-            
-            // traverse
-            $traverser->traverse($stmts);
-        } catch (PHPParser_Error $e) {
-            echo 'Parse Error: ', $e->getMessage();
-        }
-        fire('endOfRun');
     }
     
     /**

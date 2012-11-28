@@ -19,6 +19,8 @@ class NodeVisitor_ControlStructure extends PHPParser_NodeVisitorAbstract {
             case Obj_ControlStructure::EXPR_TERNARY:
                 return $this->controlStructure($node, 'resolveTernary');
                 break;
+            case Obj_ControlStructure::EXPR_LOGICAL_OR:
+                return $this->controlStructure($node, 'resolveLogicalOr');
         }
     }
     
@@ -63,6 +65,9 @@ class NodeVisitor_ControlStructure extends PHPParser_NodeVisitorAbstract {
         }
         elseif($node instanceof PHPParser_Node_Expr_Ternary) {
             return Obj_ControlStructure::EXPR_TERNARY;
+        }
+        elseif($node instanceof PHPParser_Node_Expr_LogicalOr) {
+            return Obj_ControlStructure::EXPR_LOGICAL_OR;
         }
     }
     

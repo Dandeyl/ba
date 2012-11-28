@@ -23,7 +23,10 @@ class Helper_ExpressionResolver {
         $resolved->setReturnType(false);
         $resolved->setUserDefined(false);
         
-        if($expr instanceof PHPParser_Node_Scalar) {
+        if($expr instanceof PHPParser_Node_Scalar_Encapsed) {
+            $this->resolveScalarEncapsed($expr);
+        }
+        elseif($expr instanceof PHPParser_Node_Scalar) {
             $this->resolveScalar($expr);
         }
         // => EXPR_VARIABLE          $variable
@@ -56,6 +59,28 @@ class Helper_ExpressionResolver {
             $resolved->setReturnType('bool');
             $resolved->setValue(!((bool) $resolve_expr->getValue()));
         }
+        // OR            ||
+        elseif($expr instanceof PHPParser_Node_Expr_LogicalOr) {
+            $this->resolveExprLogicalOr($expr);
+        }
+        elseif($expr instanceof PHPParser_Node_Expr_NotEqual) {
+            $left = Helper_ExpressionResolver::resolve($expr->left);
+            $right = Helper_ExpressionResolver::resolve($expr->right);
+            
+            $resolved->setReturnType("bool");
+            $resolved->setUserDefined($this->argIsUserdefined(array($left, $right)));
+            $resolved->setValue($left->getValue() != $right->getValue());
+            
+        }
+        elseif($expr instanceof PHPParser_Node_Expr_Equal) {
+            $left = Helper_ExpressionResolver::resolve($expr->left);
+            $right = Helper_ExpressionResolver::resolve($expr->right);
+            
+            $resolved->setReturnType("bool");
+            $resolved->setUserDefined($this->argIsUserdefined(array($left, $right)));
+            $resolved->setValue($left->getValue() == $right->getValue());
+            
+        }
         
         else {
             throw new Exception("Helper_ExpressionResolver: Expression of type ".  get_class($expr) ." can not be handled yet!");
@@ -73,6 +98,32 @@ class Helper_ExpressionResolver {
         $this->obj_resolved->setExecutable(true);
         $this->obj_resolved->setReturnType(true);
     }
+    
+       /**
+     * Resolve encapsed scalars.
+     * @param PHPParser_Node_Scalar_Encapsed $expr
+     */
+    protected function resolveScalarEncapsed(PHPParser_Node_Scalar_Encapsed $expr) {
+        $parts = array();
+        $value = '';
+        
+        foreach($expr->parts as $p) {
+            if(is_object($p)) {
+                $parts[] = $resolved = Helper_ExpressionResolver::resolve($p);
+                if(!$resolved->isUserDefined()) {
+                    $value .= $resolved->getValue();
+                }
+            }
+            else {
+                $value .= $p;
+            }
+        }
+        
+        $this->obj_resolved->setValue($value);
+        $this->obj_resolved->setExecutable(empty($parts));
+        $this->obj_resolved->setUserDefined($this->argIsUserdefined($parts));
+    }
+    
     
     /**
      * Resolve variables
@@ -115,7 +166,7 @@ class Helper_ExpressionResolver {
         $this->obj_resolved->setExecutable($left->isExecutable() && $right->isExecutable());
         $this->obj_resolved->setReturnType($left->getReturnType() && $right->getReturnType());
         #$resolved->setSecuredFor(array());
-        $this->obj_resolved->setUserDefined($left->isUserDefined() || $right->isUserDefined());
+        $this->obj_resolved->setUserDefined($this->argIsUserdefined(array($left, $right)));
         
         // Both expressions already have a value
         if($left->getValue() && $right->getValue()){
@@ -133,6 +184,35 @@ class Helper_ExpressionResolver {
         }
     }
     
+    
+    /**
+     * Resolve logical OR's. $var1 || $var2
+     * @param PHPParser_Node_Expr $expr
+     */
+    protected function resolveExprLogicalOr(PHPParser_Node_Expr_LogicalOr $expr) {
+        $left  = Helper_ExpressionResolver::resolve($expr->left);
+        $right = Helper_ExpressionResolver::resolve($expr->right);
+        
+        $this->obj_resolved->setExecutable($left->isExecutable() && $right->isExecutable());
+        $this->obj_resolved->setReturnType("bool");
+        #$resolved->setSecuredFor(array());
+        $this->obj_resolved->setUserDefined($this->argIsUserdefined(array($left, $right)));
+        
+        // Both expressions already have a value
+        if($left->getValue() && $right->getValue()){
+            $this->obj_resolved->setValue($left->getValue() || $right->getValue());
+        }
+        // Both expressions are executable
+        elseif($this->obj_resolved->isExecutable()) {
+            $left_expr  = $this->resolveExprConcatPrepareResolvedForEval($left);
+            $right_expr = $this->resolveExprConcatPrepareResolvedForEval($right);
+            
+            $cmd = $left_expr.'.'.$right_expr.';';
+            echo '>>>>>>>> return '.$cmd;
+            $value = eval($cmd);
+            $this->obj_resolved->setValue($value);
+        }
+    }
     
     protected function resolveExprConcatPrepareResolvedForEval(Obj_Resolved $resolved) {
         if($resolved->getvalue() !== null) { 
@@ -252,6 +332,7 @@ class Helper_ExpressionResolver {
         if(!$func) {
             ScanInfo::addNotFoundFunction($name);
             $this->obj_resolved->setValue(null);
+            $this->obj_resolved->setUserDefined(2);
             return;
         }
         
@@ -294,17 +375,7 @@ class Helper_ExpressionResolver {
         $vulnerable = $this->getVulnerableParameters($func, $values);
         
         // return user defined?
-        $return_user_defined = 0;
-        foreach($resolved_arguments as $arg) {
-            if($arg->isUserDefined() === 1) {
-                $return_user_defined = 1;
-                break;
-            }
-            elseif($arg->isUserDefined() === 2) {
-                $return_user_defined = 2;
-            }
-        }
-        $this->obj_resolved->setUserDefined($return_user_defined);
+        $this->obj_resolved->setUserDefined($this->argIsUserdefined($resolved_arguments));
 
         // get securing from parameters
         $param_indexes = $func->getReturnDefinedByParams();
@@ -373,7 +444,26 @@ class Helper_ExpressionResolver {
         }
     }
     
-    
+    /**
+     * Get the state of userdefinement from multiple expressions.
+     * Returns 0 if all expressions are not defined by the user
+     * Returns 1 if at least one argument is directly user definable
+     * Returns 2 if at least one argument depends on the content of db or file
+     * (and none is directly user definable)
+     */
+    protected function argIsUserdefined(array $arguments) {
+        $return_user_defined = 0;
+        foreach($arguments as $arg) {
+            if($arg->isUserDefined() === 1) {
+                $return_user_defined = 1;
+                break;
+            }
+            elseif($arg->isUserDefined() === 2) {
+                $return_user_defined = 2;
+            }
+        }
+        return $return_user_defined;
+    }
     
     /**
      * Resolve function calls where functions are called, that are defined by the script
