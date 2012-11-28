@@ -77,6 +77,7 @@ class Obj_Filetree {
         foreach(self::$levels as $lev) {
             self::$current = &self::$current->_twigs[$lev];
         }
+        return self::$current;
     }
     
     /**

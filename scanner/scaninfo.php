@@ -116,50 +116,17 @@ abstract class ScanInfo {
     }
     
     /**
-     * Return to the parent file in file tree.
+     * Make the parent file in the file tree the current file and return it.
      * @param string $file
+     * @return Obj_Filetree|null
      */
     public static function parentFile() {
         // are there paths left to go?
         try {
             return self::$filetree->parent();
         }
-        
-        // End of Scan reached, check if there are ControlStructure paths left
         catch(Obj_Filetree_EndOfTree_Exception $e) {
-            $control_structs = &self::$controlstructures;
-            if(!empty($control_structs)) {
-                // get last control structure
-                /* @var $struct Obj_Controlstructure */
-                $struct = null;
-                while($struct == null) {
-                    $struct = end($control_structs);
-                    // if last path of structure has been gone in this iteration, delete this
-                    // controlstructure and go to next higher level structure
-                    if($struct->getCurrentPathNumber() == $struct->getNumPaths()-1) {
-                        ScanInfo::removeLastControlStructure();
-                        $struct = null;
-                    }
-                    else {
-                        $struct->incCurrentPathNumber();
-                    }
-                    // no structures anymore
-                    if(empty($control_structs)) {
-                        break;
-                    }
-                }
-                
-                if($struct) {
-                    $skipwalker = new NodeVisitor_WalkTo($struct->getNode(), $struct->getFileStack());
-                    $tree = self::$filetree;
-                    $file = $tree::getMainFile()->getPath();
-                    // start scanning from beginning with NodeVisitor_WalkTo enabled -> walks to last found controlstructure
-                    Scanner::walkFile($file, $skipwalker);
-                }
-            }
-            else {
-                $breakpoint = true; // of of scanning process
-            }
+            return null;
         }
     }
     
@@ -358,6 +325,10 @@ abstract class ScanInfo {
             
     public static function addControlStructure(Obj_ControlStructure $struct) {
         return self::$controlstructures[] = $struct;
+    }
+    
+    public static function &getControlStructures() {
+        return self::$controlstructures;
     }
     
     /**

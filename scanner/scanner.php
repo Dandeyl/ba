@@ -42,6 +42,24 @@ abstract class Scanner {
      */
     protected static $exportdata;
     
+    /**
+     * Are we currently exiting the scanning process?
+     * @var type 
+     */
+    protected static $state_exiting = false;
+    
+    /**
+     * Scan ended but there might be paths left to go.
+     * @var type 
+     */
+    protected static $state_endofscan = false;
+    
+    /**
+     * Scan fully completed
+     * @var type 
+     */
+    protected static $state_scancomplete = false;
+    
     
     
     /////////////////////////////////////////////////////////////////////////
@@ -112,9 +130,60 @@ abstract class Scanner {
         
         self::$traverser = $traverser;
         
+        self::registerSubscribers();
                
         // initialise scan information
         ScanInfo::init();
+    }
+    
+    private static function registerSubscribers() {
+        /**
+         * File got scanned to the end. If we're in "EXITING-State" do nothing,
+         * else reactivate all NodeVisitors.
+         */
+        subscribe('endScanFile', function() {
+            self::$traverser->hasFinished(false);
+            
+            if(!self::$state_exiting) {
+                // set all visitors active again
+                self::$traverser->setActiveVisitors(array());
+            }
+        });
+        
+        
+        // End of this scanning iteration reached, check if there are controlstructure paths left
+        subscribe('endOfRun', function() {
+            $control_structs = &ScanInfo::getControlStructures();
+            if(!empty($control_structs)) {
+                // get last control structure
+                /* @var $struct Obj_Controlstructure */
+                $struct = null;
+                while($struct == null) {
+                    $struct = end($control_structs);
+                    // if last path of structure has been gone in this iteration, delete this
+                    // controlstructure and go to next higher level structure
+                    if($struct->getCurrentPathNumber() == $struct->getNumPaths()-1) {
+                        ScanInfo::removeLastControlStructure();
+                        $struct = null;
+                    }
+                    else {
+                        $struct->incCurrentPathNumber();
+                    }
+                    // no structures anymore
+                    if(empty($control_structs)) {
+                        break;
+                    }
+                }
+
+                if($struct) {
+                    $skipwalker = new NodeVisitor_WalkTo($struct->getNode(), $struct->getFileStack());
+                    $tree = ScanInfo::getFileTree();
+                    $file = $tree::getMainFile()->getPath();
+                    // start scanning from beginning with NodeVisitor_WalkTo enabled -> walks to last found controlstructure
+                    Scanner::walkFile($file, $skipwalker);
+                }
+            }
+        });
     }
     
     
@@ -126,6 +195,8 @@ abstract class Scanner {
      * @return string|false
      */
     protected static function getFileLocation($file) {
+        if(!is_string($file)) return false;
+        
         $include_paths = explode(PATH_SEPARATOR, get_include_path());
         
         $filetree = ScanInfo::getFileTree();
@@ -160,7 +231,7 @@ abstract class Scanner {
     
     /**
      * Start scanning a new file. This method:
-     *  - initialisates the parser if not done yet
+     *  - detects the full path to the file tree
      *  - writes the new file to the file tree
      *  - parses the file
      *  - traverses the nodes
@@ -168,68 +239,60 @@ abstract class Scanner {
      * @param PHPParser_Node $node Node of the include or require
      */
     public static function scanFile($rel_file, $node=null) {
-        $file = false;
-        if(is_string($rel_file)) {
-            $file = self::getFileLocation($rel_file);
-        }
-        
-        // file could not be found
-        if($file === false) {
+        // get real file path
+        if(!$file = self::getFileLocation($rel_file)) {
             ScanInfo::addFailedInclude(new Obj_FailedInclude($node)  );
             return false;
         }
         
-        
+        // add file to filetree
         ScanInfo::addFile($file, $node);
         
         $parser = self::$parser;
         $traverser = self::$traverser;
         $nodeDumper = self::$dumper;
 
-
-        echo "\n--------- SCANNING FILE: $file ---------\n\n\n";
         // execute parsing and traversing
         try {
             // parse
+            fire('beginParseFile', array($file));
             $stmts = $parser->parse(ScanInfo::getCurrentFileContent());
+            fire('endParseFile', array($file, $stmts));
+            
+            
+            // just dump the parsed file
             if(SCANNER_DUMP_TREE) {
                 echo ($nodeDumper->dump($stmts))."\n\n\n";
             }
             else {
-                // traverse
+                // Scan File
+                fire('beginScanFile', array($file));
                 $traverser->traverse($stmts);
+                fire('endScanFile', array($file));
+                
                 echo ($nodeDumper->dump($stmts))."\n\n\n";
             }
-        } catch (PHPParser_Error $e) {
-            echo 'Parse Error: ', $e->getMessage();
+        } 
+        catch (PHPParser_Error $e) {
+            fire('parseError', array($file, $e->getMessage()));
         }
+        
+        fire('endOfRun');
     }
     
     /**
-     * This method gets called when the current file is scanned to the end
+     * This method gets called when return, exit or die get called in the function
      */
     public static function scanFileEnd($exit=false) {
-        static $exiting = false;
-        
+        // Has not finished yet ("return", "die" or "exit" called) 
         if(!self::$traverser->hasFinished()) {
-            // just set fileattributesetter as active vistor
-            self::$traverser->setActiveVisitors(array(0));
-            if($exit == true) {
-                $exiting = true;
-            }
-            else {
-                $exiting = false;
-            }
-        }
-        else {
-            ScanInfo::parentFile();
-            self::$traverser->hasFinished(false);
             
-            if($exiting == false) {
-                // set all visitors active again
-                self::$traverser->setActiveVisitors(array());
-            }
+            // just set fileattributesetter as active vistor -> don't detect any vulnerabilities
+            self::$traverser->setActiveVisitors(array(0));
+            self::$state_exiting = $exit ? true : false;
+            
         }
+            
     }
     
     
@@ -256,6 +319,7 @@ abstract class Scanner {
         } catch (PHPParser_Error $e) {
             echo 'Parse Error: ', $e->getMessage();
         }
+        fire('endOfRun');
     }
     
     /**

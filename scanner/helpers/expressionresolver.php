@@ -42,6 +42,9 @@ class Helper_ExpressionResolver {
         elseif($expr instanceof PHPParser_Node_Expr_ArrayDimFetch) {
             $this->resolveExprArrayDimFetch($expr);
         }
+        elseif($expr instanceof PHPParser_Node_Expr_ConstFetch) {
+            $this->resolveExprConstFetch($expr);
+        }
         elseif($expr instanceof PHPParser_Node_Expr_Concat) {
             $this->resolveExprConcat($expr);
         }
@@ -54,7 +57,9 @@ class Helper_ExpressionResolver {
             $resolved->setValue(!((bool) $resolve_expr->getValue()));
         }
         
-        
+        else {
+            throw new Exception("Helper_ExpressionResolver: Expression of type ".  get_class($expr) ." can not be handled yet!");
+        }
         
     }
     
@@ -86,7 +91,7 @@ class Helper_ExpressionResolver {
                 $this->obj_resolved->setValue($variable->getValue());
                 $this->obj_resolved->setExecutable(false);
                 
-                print_r($variable->getHistory());
+                
             }
             else {
                 // Variable uninitialised!
@@ -203,6 +208,35 @@ class Helper_ExpressionResolver {
         }
         else {
             throw new Exception('Helper_Expressionresolver->resolveExprArrayDimFetchVarNameRecursive: Unexpected expression. '.var_export($expr, true));
+        }
+    }
+    
+    
+    /**
+     * Resolve constants.
+     * @param PHPParser_Node_Expr_ConstFetch $expr
+     */
+    protected function resolveExprConstFetch(PHPParser_Node_Expr_ConstFetch $expr) {
+        $name = Helper_NameResolver::resolve($expr);
+        
+        
+        if($name) {
+            $const = ScanInfo::findVar($name);
+
+            if($const) {
+                /*@var $const Obj_Variable */
+                $this->obj_resolved->setUserDefined($const->isUserDefined());
+                $this->obj_resolved->setSecuredBy($const->getSecuredBy());
+                $this->obj_resolved->setValue($const->getValue());
+                $this->obj_resolved->setExecutable(false);
+            }
+            else {
+                // Variable uninitialised!
+                ScanInfo::addWarning(
+                        Warning::VariableNotInitialised, 
+                        $expr
+                       );
+            }
         }
     }
     

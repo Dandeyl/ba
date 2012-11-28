@@ -1,6 +1,6 @@
 <?php 
 if($_GET["test"]) {
-    echo $_GET["test3"];
+    die();
 }
 
 elseif($_GET["test"]) {

@@ -1,7 +1,7 @@
 <?php
 /**
- * Software to check php source code for security vulnerabilities. It uses static
- * source code analysing combined with some basic dynamic analysing.
+ * Software to check php source code for security vulnerabilities. It uses dynamic
+ * source code analysing.
  * Identified security flaws:
  * - directory traversing
  *     Looks for the functions fpassthru, file, fopen, include(_once), require(_once),
@@ -22,6 +22,16 @@ define("SCANNER_DUMP_TREE", 0 ? true : false); // set 1: dump all nodes in the f
 require (dirname(__FILE__).'/parser/bootstrap.php');
 require (dirname(__FILE__).'/scanner/bootstrap.php');
 
+// register subscriber
+subscribe('beginParseFile', function($event, $file) {
+    echo "\n--------- Parsing FILE: $file ---------\n\n\n"; 
+});
+subscribe('parseError', function($event, $file, $message) {
+    die('Parse error: '.$message."\n\n");
+});
+
+
+
 // prepare file
 $filename = isset($argv[1]) ? $argv[1] : ($_GET["file"] ?: 'testfiles'. DIRECTORY_SEPARATOR."simple.php");
 $file =  $filename;
@@ -34,6 +44,7 @@ if(!file_exists($file)) {
 
 // start parsing and scanning
 Scanner::scanFile($file);
+
 
 // dump information when scanning is done
 if(!SCANNER_DUMP_TREE) {

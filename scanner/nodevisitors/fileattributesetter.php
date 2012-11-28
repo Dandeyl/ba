@@ -8,9 +8,4 @@ class NodeVisitor_FileAttributeSetter extends PHPParser_NodeVisitorAbstract {
         // set file for node
         $node->setAttribute('file', ScanInfo::getCurrentFilePath());
     }
-    
-    function afterTraverse(array $nodes) {
-        // End of this file
-        Scanner::scanFileEnd();
-    }
 }

@@ -18,6 +18,15 @@ is found, Proteus will scan all files another time.
 
 #### How the scanning process works: ###########
  
+##### Events fired ######
+parseError     - parse error occurred
+beginParseFile - start parsing a file
+endParseFile   - end parsing a file
+beginScanFile  - start scanning the nodes of a file
+endScanFile    - end scanning the nodes of a file
+endOfRun       - scanning ended but there might be paths left
+endOfScan      - scannning ended completely
+
 
 
 #### What has to be taken care of: ###########

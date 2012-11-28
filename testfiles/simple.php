@@ -1,12 +1,8 @@
 <?php
-$var = 123;
-$demo = 234;
-$demo = $var;
-$demo = $_GET["test"];
+if(defined('__FILE__')) { 
+    echo "Not defined";
+} 
 
-
-
-echo $demo;
 
 
 /*function demo($va=array(1,2)) {
