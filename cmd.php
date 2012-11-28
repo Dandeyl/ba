@@ -23,9 +23,10 @@ require (dirname(__FILE__).'/parser/bootstrap.php');
 require (dirname(__FILE__).'/scanner/bootstrap.php');
 
 // prepare file
-$filename = $argv[1] ?: ($_GET["file"] ?: "simple.php");
-$file = 'testfiles'. DIRECTORY_SEPARATOR. $filename;
+$filename = isset($argv[1]) ? $argv[1] : ($_GET["file"] ?: 'testfiles'. DIRECTORY_SEPARATOR."simple.php");
+$file =  $filename;
 chdir(dirname(__FILE__));
+
 
 if(!file_exists($file)) {
     die("\n\nPROTEUS: The selected file does not exist\n\n");

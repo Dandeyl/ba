@@ -3,21 +3,21 @@
  * Twig is the class needed to build the filetree. The main file is the first twig
  */
 class Obj_Filetree {
-    protected $path;
+    public $path;
     protected $line;
     protected $_twigs;
     protected $_pointer = -1;
     /**
      ** @var PHPParser_Node Node this file got called in. 
      */
-    protected $call_node;
+    public $call_node;
     
             
     /**
      * Twig we started with.
      * @var Obj_Filetree
      */
-    protected static $maintwig;
+    protected static $mainfile;
     
     /**
      * Array that indicates where in the filetree we are at the moment.
@@ -38,8 +38,8 @@ class Obj_Filetree {
         }
         
         // set starting twig
-        if(!isset(self::$maintwig)) {
-            self::$maintwig = &$this;            
+        if(!isset(self::$mainfile)) {
+            self::$mainfile = &$this;            
             self::$current  = &$this;
         }
         
@@ -73,7 +73,7 @@ class Obj_Filetree {
         array_pop(self::$levels);
         
         // start with main twig, then enter subtwigs
-        self::$current = &self::$maintwig; 
+        self::$current = &self::$mainfile; 
         foreach(self::$levels as $lev) {
             self::$current = &self::$current->_twigs[$lev];
         }
@@ -104,11 +104,11 @@ class Obj_Filetree {
             throw new Exception("Filetree->setLine: Invalid argument: ".var_export($line, true));
         }
         
-        $this->line = $line;
+        self::$current->line = $line;
     }
     
     public function getLine() {
-        return (int) $this->line;
+        return (int) self::$current->line;
     }
     
     /**
@@ -128,9 +128,11 @@ class Obj_Filetree {
      * )
      * @return array
      */
-    public function getCurrentFileStack() {
+    public function getCurrentFileStack($get_key=false) {
+        if($get_key) {return self::$levels; }
+        
         $return = array();
-        $twig = self::$maintwig;
+        $twig = self::$mainfile;
         
         foreach(self::$levels as $lvl) {
             $twig = $twig->_twigs[$lvl];
@@ -143,8 +145,16 @@ class Obj_Filetree {
     }
     
     public static function getMainFile() {
-        return self::$maintwig;
+        return self::$mainfile;
     }
+    
+    /**
+     * Set this file as current
+     */
+    public function setCurrent() {
+        self::$current = &$this; 
+    }
+    
 }
 
 /**

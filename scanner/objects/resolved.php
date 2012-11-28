@@ -29,6 +29,12 @@ class Obj_Resolved extends Obj_CodeSequenceInfo {
     protected $resolve_error = false;
     
     /**
+     * History of the variables that lead to this resolve-result
+     * @var type 
+     */
+    protected $histories;
+    
+    /**
      * Sets the resolved value.
      * @param mixed $value
      */
@@ -140,4 +146,22 @@ class Obj_Resolved extends Obj_CodeSequenceInfo {
     public function isResolveError() {
         return $this->resolve_error;
     }
+    
+    /**
+     * Get histories that lead to this result
+     * @return type
+     *
+    public function getHistory() {
+        return $this->histories;
+    }
+    
+    public function setHistory($histories) {
+        foreach($histories as $h) {
+            $this->addHistory($h);
+        }
+    }
+    
+    public function addHistory($history) {
+        $this->histories[] = $history;
+    }*/
 }

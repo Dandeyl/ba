@@ -42,6 +42,10 @@ class Obj_Varlist {
      */
     public function setScope($scope) {
         $this->scope = $scope;
+        if(!isset($this->variables[$scope])) {
+            $this->variables[$scope] = array();
+        }
+        
         $this->vars_referencing_to_undefined_variables->setScope($scope);
     }
     

@@ -1,14 +1,42 @@
 <?php 
-function test() {
-    echo "hallo";
+if($_GET["test"]) {
+    echo $_GET["test3"];
 }
 
-if($cond) {
-    $a = 3;
-}
-elseif(call($g) == $g) {
-    $a = $_GET["test"];
+elseif($_GET["test"]) {
+    echo $_GET["test5"];
 }
 else {
-    echo $_GET["test"];
+    echo $_GET["test4"];
+}
+
+if($_GET["test"]) {
+    echo $_GET["test3"];
+}
+elseif($_GET["test"]) {
+    echo $_GET["test5"];
+}
+else {
+    echo $_GET["test4"];
+}
+
+
+if($_GET["test"]) {
+    echo $_GET["test3"];
+}
+elseif($_GET["test"]) {
+    echo $_GET["test5"];
+}
+else {
+    echo $_GET["test4"];
+}
+
+if($_GET["test"]) {
+    echo $_GET["test3"];
+}
+elseif($_GET["test"]) {
+    echo $_GET["test5"];
+}
+else {
+    echo $_GET["test4"];
 }

@@ -10,6 +10,9 @@ class PHPParser_NodeTraverser
     protected $all_visitors;
     
     protected $visitorIndex;
+    
+    protected $hasfinished=false;
+    
     /**
      * Constructs a node traverser.
      */
@@ -27,6 +30,7 @@ class PHPParser_NodeTraverser
         $this->visitors = $this->all_visitors;
         return (count($this->all_visitors)-1);
     }
+    
     
     /**
      * Adds a visitor at a given position.
@@ -49,13 +53,18 @@ class PHPParser_NodeTraverser
         $this->visitors = $this->all_visitors;
         $this->visitorIndex = 0;
     }
+    
+    
     /**
      * Set the visitors to be active. If an empty array is passed, all visitors
      * will be made active
      * @param array $indexes
      */
-    public function setActiveVisitors(array $indexes) {
-        if(empty($indexes)) {
+    public function setActiveVisitors($indexes) {
+        if($indexes === null) {
+            $this->visitors = array();
+        }
+        elseif(empty($indexes)) {
             $this->visitors = $this->all_visitors;
         }
         else {
@@ -77,6 +86,7 @@ class PHPParser_NodeTraverser
      * @return PHPParser_Node[] Traversed array of nodes
      */
     public function traverse(array $nodes) {
+        $this->hasfinished = false;
         foreach ($this->visitors as $visitor) {
             if (null !== $return = $visitor->beforeTraverse($nodes)) {
                 $nodes = $return;
@@ -85,31 +95,20 @@ class PHPParser_NodeTraverser
 
         $nodes = $this->traverseArray($nodes);
 
+        $this->hasfinished = true;
         foreach ($this->visitors as $visitor) {
             if (null !== $return = $visitor->afterTraverse($nodes)) {
                 $nodes = $return;
             }
         }
-
+       
         return $nodes;
     }
     
-    /**
-     * Helper function to define if the following visitors should be skipped
-     * @param PHPParser_Node $node
-     * @return \PHPParser_Node
-     */
-    public function skipVisitors($skip=null) {
-        if(null === $skip) {
-            return $this->skipVisitors;
-        }
-        
-        $this->skipVisitors = $skip;
-    }
-    
+   
     protected function traverseNode(PHPParser_Node $node) {
         $node = clone $node;
-
+        
         foreach ($node->getSubNodeNames() as $name) {
             $subNode =& $node->$name;
 
@@ -137,7 +136,9 @@ class PHPParser_NodeTraverser
     protected function traverseArray(array $nodes) {
         $doNodes = array();
         reset($nodes);
+        
         while(current($nodes)) {
+            
             $i    = key($nodes);
             $node = &$nodes[$i];
             
@@ -210,5 +211,12 @@ class PHPParser_NodeTraverser
         }
 
         return $nodes;
+    }
+    
+    public function hasFinished($set=null) {
+        if($set === null) 
+            return (bool) $this->hasfinished;
+        
+        $this->hasfinished = (bool) $set;
     }
 }

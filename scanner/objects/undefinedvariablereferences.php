@@ -22,6 +22,10 @@ class Obj_UndefinedVariableReferences {
            $scope = "global";
        }
        
+       if(!isset($this->variables[$scope])) {
+           $this->variables[$scope] = array();
+       }
+       
        $this->scope = $scope;
     }
     

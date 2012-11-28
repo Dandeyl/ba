@@ -106,9 +106,9 @@ abstract class ScanInfo {
      * Add a file to the file tree.
      * @param string $file
      */
-    public static function addFile($file) {
+    public static function addFile($file, $node) {
         if(null !== self::$filetree) {
-            self::$filetree->push($file);
+            self::$filetree->push($file, $node);
         }
         else {
             self::$filetree = new Obj_Filetree($file);
@@ -119,19 +119,13 @@ abstract class ScanInfo {
      * Return to the parent file in file tree.
      * @param string $file
      */
-    public static function parentFile($exit=false) {
+    public static function parentFile() {
         // are there paths left to go?
         try {
-            if(!$exit) {
-                return self::$filetree->parent();
-            }
-            else { // exit
-                do {
-                    self::$filetree->parent();
-                } while(true);
-            }
+            return self::$filetree->parent();
         }
-        // Ende of Scan reached, check if there are ControlStructure paths left
+        
+        // End of Scan reached, check if there are ControlStructure paths left
         catch(Obj_Filetree_EndOfTree_Exception $e) {
             $control_structs = &self::$controlstructures;
             if(!empty($control_structs)) {
@@ -164,7 +158,7 @@ abstract class ScanInfo {
                 }
             }
             else {
-                $breakpoint = true;
+                $breakpoint = true; // of of scanning process
             }
         }
     }
@@ -422,7 +416,12 @@ abstract class ScanInfo {
         
     }
     
-    
+    /**
+     * Export the information we got in our scan process so far. If the optional parameter
+     * $full is set to true all data will be exported, otherwise just data needed for file-walking.
+     * @param bool $full
+     * @return string
+     */
     public static function exportScanData() {
         $exp["vars"]  = self::$varlist;
         $exp["funcs"] = self::$functions;
@@ -430,7 +429,12 @@ abstract class ScanInfo {
         $exp["scope"] = self::$scope;
         $exp["scan_run"] = self::$scan_run;
         
+        
         return serialize($exp);
+    }
+    
+    public static function exportVulnerabilityList() {
+        return serialize(self::$vulnerabilitylist);
     }
     
     public static function importScanData($export) {

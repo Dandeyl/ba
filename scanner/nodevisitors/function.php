@@ -4,7 +4,7 @@
  * 
  */
 class NodeVisitor_Function extends PHPParser_NodeVisitorAbstract {
-    public function leaveNode(PHPParser_Node $node) {
+    public function enterNode(PHPParser_Node $node) {
         if(!($node instanceof PHPParser_Node_Stmt_Function)) {
             return;
         }
@@ -15,7 +15,7 @@ class NodeVisitor_Function extends PHPParser_NodeVisitorAbstract {
         $function->setStatements($node->stmts);
         $function->setParameters($node->params);
         
-        // start analysing the function
-        
+        ScanInfo::addFunction($function);
+        return array();
     }
 }

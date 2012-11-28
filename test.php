@@ -1,2 +1,5 @@
 <?php
-var_dump((bool) array(array()));
+$var = array();
+$var["Function#Global"] = 123;
+
+var_dump($var);

@@ -93,7 +93,7 @@ class Attack_Xss
         foreach($node->exprs as $expr) {
             $resolved = Helper_ExpressionResolver::resolve($expr);
             if(self::checkXssCondition($resolved)) {
-                ScanInfo::addVulnerability(Vulnerability::Xss, $node, ScanInfo::getCurrentFilePath(), ScanInfo::getCurrentFileLine());
+                ScanInfo::addVulnerability(Vulnerability::Xss, $node);
                 break;
             }
         }
@@ -108,7 +108,7 @@ class Attack_Xss
         
         if(self::checkXssCondition($resolved)) 
         {
-            ScanInfo::addVulnerability(Vulnerability::Xss, $node, ScanInfo::getCurrentFilePath(), ScanInfo::getCurrentFilePath());
+            ScanInfo::addVulnerability(Vulnerability::Xss, $node);
         }
     }
     

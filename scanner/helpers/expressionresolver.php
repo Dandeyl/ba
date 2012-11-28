@@ -30,6 +30,14 @@ class Helper_ExpressionResolver {
         elseif($expr instanceof PHPParser_Node_Expr_Variable) {
             $this->resolveExprVariable($expr);
         }
+        // => EXPR_ARRAY
+        elseif($expr instanceof PHPParser_Node_Expr_Array) {
+            $this->resolveExprArray($expr);
+        }
+        // => EXPR_ARRAYITEM
+        elseif($expr instanceof PHPParser_Node_Expr_ArrayItem) {
+            $this->resolveExprArrayItem($expr);
+        }
         // => EXPR_ARRAYDIMFETCH     $array[$dimension]
         elseif($expr instanceof PHPParser_Node_Expr_ArrayDimFetch) {
             $this->resolveExprArrayDimFetch($expr);
@@ -39,9 +47,6 @@ class Helper_ExpressionResolver {
         }
         elseif($expr instanceof PHPParser_Node_Expr_FuncCall) {
             $this->resolveExprFunctionCall($expr);
-        }
-        elseif($expr instanceof PHPParser_Node_Arg) {
-            $this->resolveArg($expr);
         }
         elseif($expr instanceof PHPParser_Node_Expr_BooleanNot) {
             $resolve_expr = Helper_ExpressionResolver::resolve($expr->expr);
@@ -80,6 +85,8 @@ class Helper_ExpressionResolver {
                 $this->obj_resolved->setSecuredBy($variable->getSecuredBy());
                 $this->obj_resolved->setValue($variable->getValue());
                 $this->obj_resolved->setExecutable(false);
+                
+                print_r($variable->getHistory());
             }
             else {
                 // Variable uninitialised!
@@ -129,6 +136,23 @@ class Helper_ExpressionResolver {
         else {
             return Scanner::prettyPrintExpr($resolved->getExpression());
         }
+    }
+    
+    
+    /**
+     * Resolve array definition.
+     */
+    protected function resolveExprArray(PHPParser_Node_Expr_Array $expr) {
+        $arr_items = array();
+        
+        foreach($expr->items as $item) {
+            $resolved_item = self::resolve($item);
+            $arr_items[]   = $resolved_item; 
+        }
+    }
+    
+    protected function resolveExprArrayItem(PHPParser_Node_Expr_ArrayItem $item) {
+        
     }
     
     /**
@@ -198,6 +222,20 @@ class Helper_ExpressionResolver {
         }
         
         
+        // if it is a system function: 
+        //     execute it if it's safe, otherwise generate a random value
+        if(!$func->isUserDefined()) {
+            $this->resolveExprFunctionCallSystemDefined($func, $expr);
+        }
+        else {
+            $this->resolveExprFunctionCallUserDefined($func, $expr);
+        }
+    }
+    
+    /**
+     * Resolve function calls where functions are called, that are defined by php or extensions
+     */
+    protected function resolveExprFunctionCallSystemDefined(Obj_Function $func, $expr) {
         // get information about the functions parameters
         $resolved_arguments = array();
         $values      = array();
@@ -221,27 +259,7 @@ class Helper_ExpressionResolver {
         // get parameters
         $vulnerable = $this->getVulnerableParameters($func, $values);
         
-        // if it is a system function: 
-        //     execute it if it's safe, otherwise generate a random value
-        if(!$func->isUserDefined()) {
-            $data = array(
-                "vulnerable" => $vulnerable,
-                "resolved_arguments" => $resolved_arguments,
-                "values" => $values,
-                "references" => $references,
-                "expr" => $expr
-            );
-            $this->resolveExprFunctionCallSystemDefined($func, $data);
-        }
-    }
-    
-    /**
-     * Resolve function calls where functions are called, that are defined by php or extensions
-     */
-    protected function resolveExprFunctionCallSystemDefined(Obj_Function $func, array $data) {
-        extract($data);
-        
-        // user defined
+        // return user defined?
         $return_user_defined = 0;
         foreach($resolved_arguments as $arg) {
             if($arg->isUserDefined() === 1) {
@@ -321,6 +339,64 @@ class Helper_ExpressionResolver {
         }
     }
     
+    
+    
+    /**
+     * Resolve function calls where functions are called, that are defined by the script
+     */
+    protected function resolveExprFunctionCallUserDefined(Obj_Function $func, PHPParser_Node_Expr_FuncCall $expr) {
+        
+        $oldscope = ScanInfo::getScope();
+        ScanInfo::setScope('Function#'.$func->getName());
+        
+        // Write function parameters in varlist
+        foreach($func->getParameters() as $i => $func_param) {
+            if(isset($expr->args[$i])) {
+                $resolved_param = Helper_ExpressionResolver::resolve($expr->args[$i]->value);
+                
+                if($expr->args[$i]->byRef) {
+                    $refvar = ScanInfo::findVar(Helper_NameResolver::resolve($expr->args[$i]->value), $oldscope);
+                    $var = clone $refvar;
+                    $var->setScope(ScanInfo::getScope());
+                    $var->setName('$'.$func->param->name);
+                    $var->setReferenceTo(refvar);
+                }
+                else {
+                    $var = new Obj_Variable();
+                    $var->setScope(ScanInfo::getScope());
+                    $var->setName('$'.$func_param->name);
+                    $var->setUserDefined($resolved_param->isUserDefined());
+                    $var->setSecuredBy($resolved_param->getSecuredBy());
+                    $var->setValue($resolved_param->getValue());
+                }
+                
+                ScanInfo::addVar($var);
+            }
+            else {
+                // this shouldn't happen if the source code is valid
+                if(!$func_param->default) {
+                    throw new Exception("ExpressionResolver: The function called expects more parameters than given");
+                }
+                $resolved_param = Helper_ExpressionResolver::resolve($func_param->default);
+                
+                $var = new Obj_Variable('$'.$func_param->name);
+                $var->setValue($resolved_param->getValue());
+                $var->setSecuredBy($resolved_param->getSecuredBy());
+                $var->setUserDefined(false);
+                
+                ScanInfo::addVar($var);
+            }
+        }
+        
+        // Call user function statements
+        return $func->getStatements();
+    }
+    
+    
+    
+    
+    
+    
     protected function getVulnerableParameters(Obj_Function $func, array $values) {
         $return = false;
         
@@ -343,13 +419,7 @@ class Helper_ExpressionResolver {
         return $return;
     }
     
-    /**
-     * 
-     * @param PHPParser_Node_Arg $arg
-     */
-    protected function resolveArg(PHPParser_Node_Arg $arg) {
-        
-    }
+    
     
     /**
      * Returns the resolved object

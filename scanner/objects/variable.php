@@ -162,14 +162,11 @@ class Obj_Variable {
     
     // Scope
     public function setScope($scope) {
-        if(is_array($scope)) {
+        if(is_string($scope)) {
             $this->scope = $scope;
         }
-        else if(is_string($scope)) {
-            $this->scope = array($scope);
-        }
         else {
-            throw new Exception("Variable: Illegal scope passed.");
+            throw new Exception("Variable: Illegal scope passed. Scope has to be of type string");
         }
     }
         
@@ -353,7 +350,20 @@ class Obj_Variable {
         return $this->getReferenceTo()->history;
     }
     
+    
+    
+    /**
+     * Set child elements
+     */
+    public function setChildElements() {
+        
+    }
+    
     public function addChildElement($key=null, Obj_Variable $var) {
+        
+    }
+    
+    public function getChildElements() {
         
     }
 }

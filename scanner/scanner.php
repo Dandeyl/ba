@@ -99,15 +99,17 @@ abstract class Scanner {
         self::$printer  = new PHPParser_PrettyPrinter_Zend;
         self::$dumper   = new PHPParser_NodeDumper;
         
-        $traverser     = new PHPParser_NodeTraverser;
+        $traverser = new PHPParser_NodeTraverser;
         $traverser->addVisitor(new NodeVisitor_FileAttributeSetter);
         $traverser->addVisitor(new NodeVisitor_QualifiedNameResolver);
         $traverser->addVisitor(new NodeVisitor_Scope);
         $traverser->addVisitor(new NodeVisitor_Include);
         //$traverser->addVisitor(new NodeVisitor_Function);
+        $traverser->addVisitor(new NodeVisitor_FuncCall);
+        $traverser->addVisitor(new NodeVisitor_Exit);
         $traverser->addVisitor(new NodeVisitor_Assignments);
         $traverser->addVisitor(new NodeVisitor_ControlStructure);
-        $traverser->addVisitor(new NodeVisitor_FuncCall);
+        
         self::$traverser = $traverser;
         
                
@@ -151,7 +153,7 @@ abstract class Scanner {
      * @param type $rel_file
      * @param type $node
      */
-    public static function scanFileOnce($rel_file, $node=null) {
+    public static function scanFileOnce($rel_file, $node) {
         //$filetree = ScanInfo::getFileTree();
         
     }
@@ -207,7 +209,27 @@ abstract class Scanner {
      * This method gets called when the current file is scanned to the end
      */
     public static function scanFileEnd($exit=false) {
-        ScanInfo::parentFile($exit);
+        static $exiting = false;
+        
+        if(!self::$traverser->hasFinished()) {
+            // just set fileattributesetter as active vistor
+            self::$traverser->setActiveVisitors(array(0));
+            if($exit == true) {
+                $exiting = true;
+            }
+            else {
+                $exiting = false;
+            }
+        }
+        else {
+            ScanInfo::parentFile();
+            self::$traverser->hasFinished(false);
+            
+            if($exiting == false) {
+                // set all visitors active again
+                self::$traverser->setActiveVisitors(array());
+            }
+        }
     }
     
     

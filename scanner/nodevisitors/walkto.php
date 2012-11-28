@@ -57,8 +57,9 @@ class NodeVisitor_WalkTo extends PHPParser_NodeVisitorAbstract {
                && $node instanceof PHPParser_Node_Expr_Include)
         {
             // Include node to get to the node we're looking for was found
-            if($node === $this->next_include_file->getIncludeNode()) {
-                $file = $this->next_include_file->getPath();
+            if(Helper_NodeEquals::equals($node, $this->next_include_file->call_node)) {
+                $this->next_include_file->setCurrent();
+                $file = $this->next_include_file->path;
                 $this->next_include_file = array_shift($this->include_files);
                 Scanner::walkFile($file, $this);
             }
