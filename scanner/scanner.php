@@ -25,11 +25,11 @@ abstract class Scanner {
     protected static $printer;
     
     /**
-     *
+     * 
      * @var PHPParser_NodeTraverser
      */
     protected static $traverser;
-    
+        
     /**
      *
      * @var PHPParser_NodeDumper 
@@ -44,13 +44,19 @@ abstract class Scanner {
     
     /**
      * Are we currently exiting the scanning process?
-     * @var type 
+     * @var bool 
      */
     protected static $state_exiting = false;
     
     /**
+     * Are we walking to a specific node without scanning the other nodes?
+     * @var bool 
+     */
+    protected static $state_walking = false;
+    
+    /**
      * Scan ended completely
-     * @var type 
+     * @var bool 
      */
     protected static $state_endofscan = false;
     
@@ -77,8 +83,8 @@ abstract class Scanner {
             case 'Securing':
                 require(dirname(__FILE__).'/definitions/securing.php');
                 break;
-            case 'Vulnerability':
-                require(dirname(__FILE__).'/definitions/vulnerability.php');
+            case 'Attack':
+                require(dirname(__FILE__).'/definitions/attack.php');
                 break;
             case 'PHPParser_NodeVisitorAbstract':
                 require(dirname(__FILE__).'/../parser/PHPParser/NodeVisitorAbstract.php');
@@ -88,8 +94,11 @@ abstract class Scanner {
         if(substr($class_name, 0, 12) == 'NodeVisitor_') {
             include(dirname(__FILE__).'/nodevisitors/'.strtolower(substr($class_name, 12)).'.php');
         }
+        elseif(substr($class_name, 0, 7) == 'Action_') {
+            include(dirname(__FILE__).'/actions/'.strtolower(substr($class_name, 7)).'.php');
+        }
         elseif(substr($class_name, 0, 7) == 'Attack_') {
-            include(dirname(__FILE__).'/nodevisitors/attack/'.strtolower(substr($class_name, 7)).'.php');
+            include(dirname(__FILE__).'/attacks/'.strtolower(substr($class_name, 7)).'.php');
         }
         elseif(substr($class_name, 0, 7) == 'Helper_') {
             include(dirname(__FILE__).'/helpers/'.strtolower(substr($class_name, 7)).'.php');
@@ -105,7 +114,7 @@ abstract class Scanner {
     public static function init() {
         // -- autoloader
         spl_autoload_register(array("self", "scanner_autoload"));
-        include(dirname(__FILE__).'/function_replacements/functions.php');
+        include(dirname(__FILE__).'/initialisation/function_replacements/functions.php');
         
         // -- parser
         self::$parser   = new PHPParser_Parser(new PHPParser_Lexer);
@@ -115,13 +124,17 @@ abstract class Scanner {
         $traverser = new PHPParser_NodeTraverser;
         $traverser->addVisitor(new NodeVisitor_FileAttributeSetter);
         $traverser->addVisitor(new NodeVisitor_QualifiedNameResolver);
-        $traverser->addVisitor(new NodeVisitor_Scope);
-        $traverser->addVisitor(new NodeVisitor_Include);
+        $traverser->addVisitor(new NodeVisitor_LanguageConstructFunctionRenamer());
+        
+        //$traverser->addVisitor(new NodeVisitor_Scope);
+        //$traverser->addVisitor(new NodeVisitor_Include);
         //$traverser->addVisitor(new NodeVisitor_Function);
-        $traverser->addVisitor(new NodeVisitor_FuncCall);
-        $traverser->addVisitor(new NodeVisitor_Exit);
-        $traverser->addVisitor(new NodeVisitor_Assignments);
-        $traverser->addVisitor(new NodeVisitor_ControlStructure);
+        //$traverser->addVisitor(new NodeVisitor_FuncCall);
+        $traverser->addVisitor(new NodeVisitor_ActionChooser);
+        //$traverser->addVisitor(new NodeVisitor_Exit);
+        //$traverser->addVisitor(new NodeVisitor_Assignments);
+        //$traverser->addVisitor(new NodeVisitor_ControlStructure);
+        
         
         self::$traverser = $traverser;
         
@@ -131,23 +144,37 @@ abstract class Scanner {
         ScanInfo::init();
     }
     
+    /**
+     * Are we currently just walking to a node without scanning.
+     * @return type
+     */
+    public static function isWalking() {
+        return self::$state_walking;
+    }
+    
+    /**
+     * Are we currently exiting this scanning run?
+     * @return type
+     */
+    public static function isExiting() {
+        return self::$state_exiting;
+    }
+    
     private static function registerSubscribers() {
         /**
          * File got scanned to the end. If we're in "EXITING-State" do nothing,
          * else reactivate all NodeVisitors.
          */
         subscribe('endScanFile', function() {
-            self::$traverser->hasFinished(false);
-            
-            if(!self::$state_exiting) {
-                // set all visitors active again
-                self::$traverser->setActiveVisitors(array());
-            }
+            ScanInfo::parentFile();
         });
         
         
         // End of this scanning iteration reached, check if there are controlstructure paths left
         subscribe('endOfRun', function() {
+            self::$state_exiting = false;
+            self::$state_walking = false;
+            
             $control_structs = &ScanInfo::getControlStructures();
             if(!empty($control_structs)) {
                 // get last control structure
@@ -180,6 +207,7 @@ abstract class Scanner {
             }
             
             if(empty($control_structs)) {
+                $warnings = ScanInfo::getVulnerabilityList();
                 self::$state_endofscan = true;
             }
         });
@@ -221,7 +249,11 @@ abstract class Scanner {
     
     
     
-    
+    /**
+     * Starts the scanning process. Loops scanning while end of scan is not reached.
+     * @param type $start_file
+     * @return boolean
+     */
     public static function startScan($start_file) {
         // get real file path
         if(!$file = self::getFileLocation($start_file)) {
@@ -230,37 +262,9 @@ abstract class Scanner {
         // add file to filetree
         ScanInfo::addFile($file, null);
         
-        
-        $parser = self::$parser;
-        $traverser = self::$traverser;
-        $nodeDumper = self::$dumper;
-        
         do {
-            // execute parsing and traversing
-            try {
-                // parse
-                fire('beginParseFile', array($file));
-                $stmts = $parser->parse(ScanInfo::getCurrentFileContent());
-                fire('endParseFile', array($file, $stmts));
-
-
-                // just dump the parsed file
-                if(SCANNER_DUMP_TREE) {
-                    echo ($nodeDumper->dump($stmts))."\n\n\n";
-                }
-                else {
-                    // Scan File
-                    fire('beginScanFile', array($file));
-                    $traverser->traverse($stmts);
-                    //echo "\n\n".$nodeDumper->dump($stmts)."\n\n\n";
-                    fire('endScanFile', array($file));
-
-                }
-            } 
-            catch (PHPParser_Error $e) {
-                fire('parseError', array($file, $e->getMessage()));
-            }
-
+            // start scanning first file
+            self::scanFile();
             fire('endOfRun');
         } while(!self::$state_endofscan);
         
@@ -290,7 +294,7 @@ abstract class Scanner {
      * @param string $rel_file File to be included
      * @param PHPParser_Node $node Node of the include or require
      */
-    public static function scanFile($rel_file, $node=null) {
+    public static function scanFile($rel_file=null, $node=null) {
         // get real file path
         if($rel_file) {
             if(!$file = self::getFileLocation($rel_file)) {
@@ -303,9 +307,9 @@ abstract class Scanner {
         }
 
         $parser = self::$parser;
-        $traverser = self::$traverser;
         $nodeDumper = self::$dumper;
-
+        $file = ScanInfo::getCurrentFilePath();
+        
         // execute parsing and traversing
         try {
             // parse
@@ -321,7 +325,7 @@ abstract class Scanner {
             else {
                 // Scan File
                 fire('beginScanFile', array($file));
-                $traverser->traverse($stmts);
+                self::$traverser->traverse($stmts);
                 fire('endScanFile', array($file));
 
             }
@@ -329,8 +333,6 @@ abstract class Scanner {
         catch (PHPParser_Error $e) {
             fire('parseError', array($file, $e->getMessage()));
         }
-
-        fire('endOfRun');
     }
     
     /**
@@ -338,13 +340,7 @@ abstract class Scanner {
      */
     public static function scanFileEnd($exit=false) {
         // Has not finished yet ("return", "die" or "exit" called) 
-        if(!self::$traverser->hasFinished()) {
-            
-            // just set fileattributesetter as active vistor -> don't detect any vulnerabilities
-            self::$traverser->setActiveVisitors(array(0));
-            self::$state_exiting = $exit ? true : false;
-            
-        }
+        self::$state_exiting = $exit ? true : false;
     }
     
     
@@ -355,11 +351,10 @@ abstract class Scanner {
      * @param NodeVisitor_WalkTo From which node the scanning process shall be started.
      */
     public static function walkFile($file, NodeVisitor_WalkTo $nodevisitor) {
-        // TODO: chmod?
-        $parser    = self::$parser;
-        $traverser = self::$traverser;
-        $idx = $traverser->addVisitor($nodevisitor);
-        $traverser->setActiveVisitors(array(0,1,$idx));
+        self::walkFileEnd(); // Delete all existing NodeVisitor_WalkTos
+        self::$state_walking = true;
+        self::$traverser->addVisitor($nodevisitor);
+        //$traverser->setActiveVisitors(array($idx, 0));
     }
     
     /**
@@ -367,9 +362,8 @@ abstract class Scanner {
      * and re-enable all nodevisitors.
      */
     public static function walkFileEnd() {
-        $traverser = self::$traverser;
-        $traverser->removeVisitor('NodeVisitor_WalkTo');
-        $traverser->setActiveVisitors(array());
+        self::$state_walking = false;
+        self::$traverser->removeVisitor('NodeVisitor_WalkTo');
     }
     
     /**

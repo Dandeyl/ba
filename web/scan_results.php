@@ -99,11 +99,9 @@ require("menu.php");
                                                                 <li class="dropdown">
                                                                   <a href="#" class="dropdown-toggle" data-toggle="dropdown">Sort by <b class="caret"></b></a>
                                                                   <ul class="dropdown-menu">
-                                                                    <li><a href="#">Action</a></li>
-                                                                    <li><a href="#">Another action</a></li>
-                                                                    <li><a href="#">Something else here</a></li>
-                                                                    <li class="divider"></li>
-                                                                    <li><a href="#">Separated link</a></li>
+                                                                    <li><a href="#">Easily detectable first</a></li>
+                                                                    <li><a href="#">Line number</a></li>
+                                                                    <li><a href="#">Attack type</a></li>
                                                                   </ul>
                                                                 </li>
                                                             </ul>
@@ -127,8 +125,8 @@ require("menu.php");
                                                         </tr>
                                                         <tr>
                                                             <th># vulnerabilities</th>
-                                                            <td>0</td>
-                                                            <td>0</td>
+                                                            <td><?= $vulnlist->getNumVulnerabilities('xss'); ?></td>
+                                                            <td><?= $vulnlist->getNumVulnerabilities('sql'); ?></td>
                                                             <td></td>
                                                             <td></td>
                                                             <td></td>

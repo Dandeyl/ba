@@ -13,6 +13,7 @@ class Obj_ControlStructure {
     const STMT_FOREACH = 9;
     const EXPR_TERNARY = 10;
     const EXPR_LOGICAL_OR = 11;
+    const STMT_CONDITION = 12;
     
     /**
      * Type of the control structure. (IF/SWITCH/WHILE/...)

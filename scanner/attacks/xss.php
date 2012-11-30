@@ -13,7 +13,7 @@
  */
 
 
-class Attack_SqlInjection
+class Attack_Xss
 {
     const STMT_ECHO  = 1;
     const EXPR_PRINT = 2;
@@ -93,7 +93,7 @@ class Attack_SqlInjection
         foreach($node->exprs as $expr) {
             $resolved = Helper_ExpressionResolver::resolve($expr);
             if(self::checkXssCondition($resolved)) {
-                ScanInfo::addVulnerability(Vulnerability::Xss, $node);
+                ScanInfo::addVulnerability(Attack::Xss, $node);
                 break;
             }
         }
@@ -108,15 +108,16 @@ class Attack_SqlInjection
         
         if(self::checkXssCondition($resolved)) 
         {
-            ScanInfo::addVulnerability(Vulnerability::Xss, $node);
+            ScanInfo::addVulnerability(Attack::Xss, $node);
         }
     }
+    
     
     /**
      * Return if all conditions required for a possible xss condition are met
      * @param Obj_Resolved $resolved
      */
-    protected static function checkXssCondition(Obj_Resolved $resolved) {
+    public static function checkXssCondition(Obj_Resolved $resolved) {
         if($resolved->isUserDefined() 
            && !(   $resolved->isSecuredBy(Securing::SpecialCharsEncode)
                 || $resolved->isSecuredBy(Securing::StripTags)

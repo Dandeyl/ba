@@ -263,6 +263,14 @@ class Obj_Function {
     }
     
     /**
+     * Get if function is vulnerable for a specific attack
+     * @param string $vuln_for
+     */
+    public function isVulnerableFor($attack) {
+        return $this->vulnerable_for == $attack;
+    }
+    
+    /**
      * Set parameters that are vulnerable
      * @param array $parameters
      */

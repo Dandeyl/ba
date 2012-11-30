@@ -317,6 +317,29 @@ class PHPParser_PrettyPrinter_Zend extends PHPParser_PrettyPrinterAbstract
     public function pExpr_FuncCall(PHPParser_Node_Expr_FuncCall $node) {
         return $this->p($node->name) . '(' . $this->pCommaSeparated($node->args) . ')';
     }
+    
+    /// Addition definitions
+    public function pExpr_FuncCallEcho(PHPParser_Node_Expr_FuncCall $node) {
+        return $this->p($node->name) . ' ' . $this->pCommaSeparated($node->args) ;
+    }
+    public function pExpr_FuncCallPrint(PHPParser_Node_Expr_FuncCall $node) {
+        return $this->p($node->name) . ' ' . $this->pCommaSeparated($node->args) ;
+    }
+    public function pExpr_FuncCallExit(PHPParser_Node_Expr_FuncCall $node) {
+        return 'die' . (null !== $node->args[0] ? '(' . $this->p($node->args[0]) . ')' : '');
+    }
+    public function pExpr_FuncCallInclude(PHPParser_Node_Expr_FuncCall $node) {
+        static $map = array(
+            PHPParser_Node_Expr_Include::TYPE_INCLUDE      => 'include',
+            PHPParser_Node_Expr_Include::TYPE_INCLUDE_ONCE => 'include_once',
+            PHPParser_Node_Expr_Include::TYPE_REQUIRE      => 'require',
+            PHPParser_Node_Expr_Include::TYPE_REQUIRE_ONCE => 'require_once',
+        );
+
+        return $map[$node->type] . ' ' . $this->p($node->args[0]);
+    }
+    
+    /////////////////////////
 
     public function pExpr_MethodCall(PHPParser_Node_Expr_MethodCall $node) {
         return $this->pVarOrNewExpr($node->var) . '->' . $this->pObjectProperty($node->name)

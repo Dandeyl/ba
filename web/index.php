@@ -78,6 +78,7 @@
 								<p>Some additional text.</p>
                                                                 <p>Some additional text.</p>
                                                                 <p>Some additional text.</p>
+                                                                <div class="alert alert-error">SQL Injection possible!</div>
 							</article>
 
 

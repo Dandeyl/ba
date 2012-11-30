@@ -17,6 +17,7 @@ abstract class Securing {
             case 'striptags':
                 return self::StripTags;
             case 'addslashes':
+            case 'addslash':
                 return self::AddSlashes;
             case 'shellescape':
             case 'escapeshellcmd':

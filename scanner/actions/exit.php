@@ -1,9 +1,9 @@
 <?php
 
-class NodeVisitor_Exit extends PHPParser_NodeVisitorAbstract {
+class Action_Exit {
     
     public function leaveNode(PHPParser_Node $node) {
-        if($node instanceof PHPParser_Node_Expr_Exit) {
+        if($node instanceof PHPParser_Node_Expr_FuncCallExit) {
             Scanner::scanFileEnd(true);
         }
         

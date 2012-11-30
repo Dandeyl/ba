@@ -1,5 +1,5 @@
 <?php
-abstract class Vulnerability {
+abstract class Attack {
     const Xss='xss';
     const SqlInjection='sql';
     const DirectoryTraversal ='dir';

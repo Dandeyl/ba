@@ -139,8 +139,8 @@ class PHPParser_NodeTraverser
         
         while(current($nodes)) {
             
-            $i    = key($nodes);
-            $node = &$nodes[$i];
+            $nkey = key($nodes);
+            $node = &$nodes[$nkey];
             
             if (is_array($node)) {
                 $node = $this->traverseArray($node);
@@ -155,46 +155,43 @@ class PHPParser_NodeTraverser
                     while (($visitor = @$this->visitors[$this->visitorIndex])) {
                         $return = $visitor->enterNode($node);
                         if (is_array($return)) {
-                            $doNodes[] = array($i, $return);
+                            $doNodes[] = array($nkey, $return);
                             break;
                         }
                         elseif (null !== $return) {
                             $node = $return;
                         }
-                        elseif(!empty($this->node_replacements)) {
-                            $doNodes[] = array($i, $this->node_replacements);
-                        }
                         $this->visitorIndex++;
                     }
+                                        
+                    // insert nodes in nodeslist
                     if (!empty($doNodes)) {
                         while (list($i, $replace) = array_pop($doNodes)) {
                             array_splice($nodes, $i, 1, $replace);
                         }
-                        $node = current($nodes);
-                        if($node !== false) {
+                        $node = &$nodes[$nkey];
+                        if($node) {
                             $enterNode = true;
                             $this->visitorIndex = 0;
                         }
-                        
                     }
                 }
                 
-                if($node === false) {
+                if(!$node) {
                     continue;
                 }
                 
                 $node = $this->traverseNode($node);
-
                 
                 // LEAVE NODE for each visitor
                 foreach ($this->visitors as $visitor) {
                     $return = $visitor->leaveNode($node);
 
                     if (false === $return) {
-                        $doNodes[] = array($i, array());
+                        $doNodes[] = array($nkey, array());
                         break;
                     } elseif (is_array($return)) {
-                        $doNodes[] = array($i, $return);
+                        $doNodes[] = array($nkey, $return);
                         break;
                     } elseif (null !== $return) {
                         $node = $return;

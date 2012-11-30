@@ -1,6 +1,6 @@
 <?php
 
-class NodeVisitor_ControlStructure extends PHPParser_NodeVisitorAbstract {
+class Action_ControlStructure {
     /**
      * Checks if the node is a control structure, and starts the required actions if so
      * @param PHPParser_Node $node
@@ -21,6 +21,8 @@ class NodeVisitor_ControlStructure extends PHPParser_NodeVisitorAbstract {
                 break;
             case Obj_ControlStructure::EXPR_LOGICAL_OR:
                 return $this->controlStructure($node, 'resolveLogicalOr');
+            case Obj_ControlStructure::STMT_CONDITION:
+                return $this->controlStructure($node, 'resolveCondition');
         }
     }
     

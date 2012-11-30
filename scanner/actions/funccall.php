@@ -2,7 +2,7 @@
 /**
  * This visitor is used when a function call was found
  */
-class NodeVisitor_FuncCall extends PHPParser_NodeVisitorAbstract {
+class Action_FuncCall {
     public function leaveNode(PHPParser_Node $node) {
         if(!($node instanceof PHPParser_Node_Expr_FuncCall)
            && !($node instanceof PHPParser_Node_Stmt_Echo)
@@ -12,8 +12,11 @@ class NodeVisitor_FuncCall extends PHPParser_NodeVisitorAbstract {
         }
         
         // XSS Function?
-        if($ret = Attack_Xss::isXssFunction($node)) {
+        if(($ret = Attack_Xss::isXssFunction($node) == true)) {
             Attack_Xss::checkNode($node, $ret);
+        }
+        elseif(($ret = Attack_SqlInjection::isSqlInjectableFunction($node)) == true) {
+            Attack_SqlInjection::checkNode($node, $ret);
         }
         //elseif...
         

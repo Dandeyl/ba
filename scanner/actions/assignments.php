@@ -3,29 +3,28 @@
  * This class collects information about variables. It stops everytime a variable 
  * or constant is assigned.
  */
-class NodeVisitor_Assignments extends PHPParser_NodeVisitorAbstract
+class Action_Assignments
 {
     /**
      * This method writes the scanned variable into the varlist in class ScanInfo
      * @param PHPParser_Node $node
      */
-    public function leaveNode(PHPParser_Node $node) { // use leaveNode to be able to parse sth like $node = ($p = 123); 
-        $assignment_type = $this->getAssignmentType($node);
+    public static function leaveNode(PHPParser_Node $node) { // use leaveNode to be able to parse sth like $node = ($p = 123); 
+        $assignment_type = self::isAssignment($node);
         
         // no assignment, continue
-        if(!$assignment_type) {
-            return;
-        }
+        if(!$assignment_type) return;
         
-        $assignment_target = $this->getAssignmentTarget($node, $assignment_type);
+        
+        $assignment_target = self::getAssignmentTarget($node, $assignment_type);
         
         // variable
         if($assignment_target == Assignment::TargetVariable) {
-            return $this->resolveVariable($node, $assignment_type);
+            return self::resolveVariable($node, $assignment_type);
         }
         // array
         elseif($assignment_target == Assignment::TargetArray) {
-            return $this->resolveArray($node);
+            return self::resolveArray($node);
         }
         // define() and const
         elseif($assignment_target == Assignment::TargetConstant) {
@@ -43,7 +42,7 @@ class NodeVisitor_Assignments extends PHPParser_NodeVisitorAbstract
      * Return the assignment type.
      * @param PHPParser_Node $node
      */
-    protected function getAssignmentType(PHPParser_Node $node) {
+    public static function isAssignment(PHPParser_Node $node) {
         $class = get_class($node);
         switch($class) {
             case 'PHPParser_Node_Expr_Assign':           return Assignment::Assign; break;
@@ -75,7 +74,7 @@ class NodeVisitor_Assignments extends PHPParser_NodeVisitorAbstract
     /**
      * Is the current node a variable assignment
      */
-    protected function getAssignmentTarget(PHPParser_Node $node, $assignment_type) {
+    protected static function getAssignmentTarget(PHPParser_Node $node, $assignment_type) {
         $assignments = array(
             Assignment::Assign,
             Assignment::AssignBitwiseAnd,
@@ -143,7 +142,7 @@ class NodeVisitor_Assignments extends PHPParser_NodeVisitorAbstract
      * @param type $type
      * @return boolean
      */
-    private function isValidName($name, $type) {
+    private static function isValidName($name, $type) {
         if($type == Assignment::TargetVariable) {
             if(preg_match('/^\$[a-z_][a-z0-9_]*?$/i', $name)) {
                 return true;
@@ -166,12 +165,12 @@ class NodeVisitor_Assignments extends PHPParser_NodeVisitorAbstract
      * @return type
      * @throws Exception
      */
-    protected function resolveVariable(PHPParser_Node $node, $assignment_type) {
+    protected static function resolveVariable(PHPParser_Node $node, $assignment_type) {
         // get resolved name
         $name    = Helper_NameResolver::resolve($node->var);
        
         // check resolved name
-        if(!$this->isValidName($name, Assignment::TargetVariable)) {
+        if(!self::isValidName($name, Assignment::TargetVariable)) {
             if($name == false) {
                 // could not resolve variable name
                 throw new Exception("NodeVisitor_Assignment: Can't resolve variable name");
@@ -186,13 +185,13 @@ class NodeVisitor_Assignments extends PHPParser_NodeVisitorAbstract
         // Value assignment
         if($assignment_type != Assignment::AssignRef) {
             $resolve = Helper_ExpressionResolver::resolve($node->expr);
-            $this->addVariable($name, $resolve, $assignment_type, $node);
+            self::addVariable($name, $resolve, $assignment_type, $node);
         }
         
         // reference assignment
         else {
             $reference = Helper_NameResolver::resolve($node->expr);
-            $this->addVariableRef($name, $reference, $node);
+            self::addVariableRef($name, $reference, $node);
         }
         return $node->var;
     }
@@ -206,7 +205,7 @@ class NodeVisitor_Assignments extends PHPParser_NodeVisitorAbstract
      * @param int $assignment_type
      * @param PHPParser_Node $node
      */
-    private function addVariable($name, Obj_Resolved $resolved, $assignment_type, $node) {
+    private static function addVariable($name, Obj_Resolved $resolved, $assignment_type, $node) {
         $vari = new Obj_Variable($name);
         $vari->setScope(ScanInfo::getScope());
         $vari->setSecuredBy($resolved->getSecuredBy());
@@ -231,10 +230,9 @@ class NodeVisitor_Assignments extends PHPParser_NodeVisitorAbstract
      * @param string $reference Name of the reference variable
      * @param PHPParser_Node Node of the assignment in the tree
      */
-    private function addVariableRef($name, $reference, $node) {
+    private static function addVariableRef($name, $reference, $node) {
         $ref_vari = ScanInfo::findVar($reference);
-        
-        
+                
         $vari = new Obj_Variable($name);
         $vari->setAssignmentNode($node);
         $vari->setScope(ScanInfo::getScope());

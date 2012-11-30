@@ -13,7 +13,7 @@ class Helper_ControlStructureResolver {
     
     
     protected function __construct(PHPParser_Node $node) {
-        $type = NodeVisitor_ControlStructure::isControlStructure($node);
+        $type = Action_ControlStructure::isControlStructure($node);
         
         $struct = &$this->struct;
         $struct = new Obj_ControlStructure($type, $node);
@@ -27,34 +27,17 @@ class Helper_ControlStructureResolver {
         $this->struct->setType(Obj_ControlStructure::STMT_IF);
         $conditions = &$this->conditions;
         
+        
         // ----  IF                                               merge condition and stmts (
-        $conditions[] = $node->cond;
+        $this->attachConditions($node->cond);
         // check if condition is always true
         if($this->addPathInIfStmt(Obj_ControlStructure::STMT_IF, $node->cond, $node->stmts) === true) {
             return;
         }
         
-        /*if(!$resolve->isUserDefined() 
-           && ((bool) $resolve->getValue()) === false) {
-            // this path never gets executed (not user defined and false)
-        }
-        else {
-            $struct_path  = new Obj_ControlStructurePath(Obj_ControlStructure::STMT_IF, array_merge($conditions, $node->stmts));
-            $struct_path->setCond($node->cond);
-            
-            if($resolve->isUserDefined()) {
-                $paths[] = $struct_path;
-            }
-            elseif(((bool) $resolve->getValue()) === true) {
-                $paths[] = $struct_path;
-                $this->struct->setPaths($paths);
-                return;
-            }
-        }*/
-        
         // ------ ELSEIFs
         foreach((array) $node->elseifs as $elseif) {
-            $conditions[]= $elseif->cond;
+            $this->attachConditions($elseif->cond);
             if($this->addPathInIfStmt(Obj_ControlStructure::STMT_ELSEIF, $elseif->cond, $elseif->stmts) === true) {
                 return;
             }
@@ -66,6 +49,19 @@ class Helper_ControlStructureResolver {
         $this->struct->addPath($struct_path);
     }
     
+    
+    /**
+     * Strips the nodes from a condition that are 
+     * @param type $condition
+     */
+    protected function attachConditions($node_cond) {
+        $cond = Helper_ConditionImportantExpressionResolver::resolve($node_cond);
+        if(!empty($cond)) {
+            $this->conditions = $this->conditions + $cond;
+        }
+    }
+
+
     /**
      * Checks if the path has to be gone. Adds it to the structure 
      * @param int $path_type Type of the path the gets added (IF/ELSEIF...)
@@ -84,8 +80,8 @@ class Helper_ControlStructureResolver {
             return false;
         }
         else {
-            $struct_path  = new Obj_ControlStructurePath($path_type, $stmts); // TODO:
-            //$struct_path  = new Obj_ControlStructurePath($path_type, array_merge($this->conditions, $stmts));
+            $struct_path  = new Obj_ControlStructurePath($path_type, array_merge($this->conditions, $stmts));
+            //$struct_path  = new Obj_ControlStructurePath($path_type, $stmts);
             $struct_path->setCond($condition);
             
             if($resolve->isUserDefined()) {
@@ -139,7 +135,6 @@ class Helper_ControlStructureResolver {
     
     protected function getStruct() {
         return $this->struct;
-        if($test == $test) {if($test == $test) {  echo "j";} echo "lo";}
     }
     
     

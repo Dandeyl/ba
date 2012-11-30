@@ -3,7 +3,7 @@
  * @runTestsInSeparateProcesses
  */
 class ControlstructTest extends PHPUnit_Framework_TestCase {
-    const srcPath = '2_test_controlstructs/';
+    const srcPath = 'testfiles/2_test_controlstructs/';
     const cmdPath = '../cmd.php';
     
     /**

@@ -54,7 +54,7 @@ class NodeVisitor_WalkTo extends PHPParser_NodeVisitorAbstract {
         
         // include or require found
         elseif(null !== $this->next_include_file
-               && $node instanceof PHPParser_Node_Expr_Include)
+               && $node instanceof PHPParser_Node_Expr_FuncCallInclude)
         {
             // Include node to get to the node we're looking for was found
             if(Helper_NodeEquals::equals($node, $this->next_include_file->call_node)) {
@@ -62,12 +62,12 @@ class NodeVisitor_WalkTo extends PHPParser_NodeVisitorAbstract {
                 $file = $this->next_include_file->path;
                 $this->next_include_file = array_shift($this->include_files);
                 Scanner::walkFile($file, $this);
-                Scanner::scanFile($file);
+                Scanner::scanFile();
             }
         }
         
         // controlstructure found
-        elseif(NodeVisitor_ControlStructure::isControlStructure($node)) {
+        elseif(Action_ControlStructure::isControlStructure($node)) {
             $struct = ScanInfo::findControlStructureByNode($node);
             return $struct->getPath($struct->getCurrentPathNumber())->getStmts();
         }

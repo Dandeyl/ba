@@ -74,10 +74,10 @@ abstract class ScanInfo {
         self::$controlstructures = array();
         
         // put information in varlist
-        require_once dirname(__FILE__).'/info_initialisation/variable_initialisations.php';
+        require_once dirname(__FILE__).'/initialisation/variable_initialisations.php';
         
         // put information in function list
-        require_once dirname(__FILE__).'/info_initialisation/function_initialisations.php';
+        require_once dirname(__FILE__).'/initialisation/function_initialisations.php';
     }
     
     
@@ -381,8 +381,6 @@ abstract class ScanInfo {
     
     
     
-    
-    
     public static function addNotFoundClass($name) {
         
     }
@@ -449,5 +447,6 @@ abstract class ScanInfo {
         }
         
         echo "\n\nMemory used: ".memory_get_usage(true)."\n";
+        echo "Time used: ".(microtime(true) - TIME_STARTED)."\n";
     }
 }

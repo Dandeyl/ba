@@ -78,6 +78,16 @@ function funcini_check_array($param, $seperator) {
     return array_filter($parameters);
 }
 
+function funcini_vulnerable_parameters($parameters) {
+    $parameters = explode(',', $parameters);
+    
+    if($parameters[0] == '*') {
+        return array();
+    }
+    
+    return array_filter($parameters);
+}
+
 function funcini_return_source($source) {
     switch($source) {
         case '':
@@ -127,8 +137,8 @@ function import_csv($file) {
         $func->setReturnRemoveSecuring(Securing::get($return_remove_securing));
         $func->setReturnUserDefined(funcini_return_source($return_source));
         $func->setReturnDefinedByParams(funcini_check_array($params_defining_return, ','));
-        $func->setVulnerableFor(Vulnerability::get($vuln_for));
-        $func->setVulnerableParameters(funcini_check_array($args_vulnerable, ","));
+        $func->setVulnerableFor(Attack::get($vuln_for));
+        $func->setVulnerableParameters(funcini_vulnerable_parameters($args_vulnerable));
         $func->setFunctionToCheckForVulnerability(funcini_check_value($func_to_check_vulnerability));
         $func->setFunctionReplacement($func_replacement);
 

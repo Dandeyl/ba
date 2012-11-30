@@ -3,7 +3,7 @@
  * @runTestsInSeparateProcesses
  */
 class VarTest extends PHPUnit_Framework_TestCase {
-    const srcPath = '1_test_variables/';
+    const srcPath = 'testfiles/1_test_variables/';
     const cmdPath = '../cmd.php';
     
     public function testVar1_NoVulnerabilityBasic() {

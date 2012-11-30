@@ -1,10 +1,10 @@
 <?php 
-echo $_GET["test"];
-
 if($_GET["test"]) {
-    echo $_GET["test3"];
+    echo $_GET["v1"];
+}
+elseif($_GET["test"]) {
+    echo $_GET["v2"];
 }
 else {
-    echo $_GET["test4"];
+    echo $_GET["v2"];
 }
-

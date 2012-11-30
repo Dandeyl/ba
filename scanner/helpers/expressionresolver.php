@@ -37,19 +37,24 @@ class Helper_ExpressionResolver {
         elseif($expr instanceof PHPParser_Node_Expr_Array) {
             $this->resolveExprArray($expr);
         }
-        // => EXPR_ARRAYITEM
-        elseif($expr instanceof PHPParser_Node_Expr_ArrayItem) {
-            $this->resolveExprArrayItem($expr);
-        }
         // => EXPR_ARRAYDIMFETCH     $array[$dimension]
         elseif($expr instanceof PHPParser_Node_Expr_ArrayDimFetch) {
             $this->resolveExprArrayDimFetch($expr);
         }
+        // => EXPR_ARRAYITEM
+        elseif($expr instanceof PHPParser_Node_Expr_ArrayItem) {
+            $this->resolveExprArrayItem($expr);
+        }
+        
         elseif($expr instanceof PHPParser_Node_Expr_ConstFetch) {
             $this->resolveExprConstFetch($expr);
         }
         elseif($expr instanceof PHPParser_Node_Expr_Concat) {
             $this->resolveExprConcat($expr);
+        }
+        // Assignment
+        elseif(Action_Assignments::isAssignment($expr)) {
+            return Action_Assignments::leaveNode($expr);
         }
         elseif($expr instanceof PHPParser_Node_Expr_FuncCall) {
             $this->resolveExprFunctionCall($expr);
@@ -60,9 +65,11 @@ class Helper_ExpressionResolver {
             $resolved->setValue(!((bool) $resolve_expr->getValue()));
         }
         // OR            ||
-        elseif($expr instanceof PHPParser_Node_Expr_LogicalOr) {
+        elseif(   $expr instanceof PHPParser_Node_Expr_LogicalOr 
+               || $expr instanceof PHPParser_Node_Expr_BooleanOr) {
             $this->resolveExprLogicalOr($expr);
         }
+        
         elseif($expr instanceof PHPParser_Node_Expr_NotEqual) {
             $left = Helper_ExpressionResolver::resolve($expr->left);
             $right = Helper_ExpressionResolver::resolve($expr->right);
@@ -79,9 +86,26 @@ class Helper_ExpressionResolver {
             $resolved->setReturnType("bool");
             $resolved->setUserDefined($this->argIsUserdefined(array($left, $right)));
             $resolved->setValue($left->getValue() == $right->getValue());
-            
         }
-        
+        elseif($expr instanceof PHPParser_Node_Expr_Plus) {
+            $left = Helper_ExpressionResolver::resolve($expr->left);
+            $right = Helper_ExpressionResolver::resolve($expr->right);
+            
+            if(!$left->isUserDefined() && !$right->isUserDefined()) {
+                if($left->getReturnType() == "array" && $right->getReturnType() == "array") {
+                    if(empty($left->getValue())) {
+                        $resolved->setValue($right->getValue());
+                    }
+                    $resolved->setValue($left->getValue());
+                }
+                else {
+                    $resolved->setValue($left->getValue() + $right->getValue());
+                }
+            }
+            else {
+                $resolved->setUserDefined($this->argIsUserdefined(array($left, $right)));
+            }
+        }
         else {
             throw new Exception("Helper_ExpressionResolver: Expression of type ".  get_class($expr) ." can not be handled yet!");
         }
@@ -122,6 +146,7 @@ class Helper_ExpressionResolver {
         $this->obj_resolved->setValue($value);
         $this->obj_resolved->setExecutable(empty($parts));
         $this->obj_resolved->setUserDefined($this->argIsUserdefined($parts));
+        $this->obj_resolved->setSecuredBy($this->argIsSecuredBy($parts));
     }
     
     
@@ -150,6 +175,8 @@ class Helper_ExpressionResolver {
                         Warning::VariableNotInitialised, 
                         $expr
                        );
+                $this->obj_resolved->setUserDefined(true);
+                $this->obj_resolved->setValue(null);
             }
         }
     }
@@ -189,7 +216,7 @@ class Helper_ExpressionResolver {
      * Resolve logical OR's. $var1 || $var2
      * @param PHPParser_Node_Expr $expr
      */
-    protected function resolveExprLogicalOr(PHPParser_Node_Expr_LogicalOr $expr) {
+    protected function resolveExprLogicalOr(PHPParser_Node_Expr $expr) {
         $left  = Helper_ExpressionResolver::resolve($expr->left);
         $right = Helper_ExpressionResolver::resolve($expr->right);
         
@@ -331,8 +358,7 @@ class Helper_ExpressionResolver {
         // if it's not defined (yet), add a notice to ScanInfo
         if(!$func) {
             ScanInfo::addNotFoundFunction($name);
-            $this->obj_resolved->setValue(null);
-            $this->obj_resolved->setUserDefined(2);
+            $this->resolveExprFunctionCallNotDefined($expr);
             return;
         }
         
@@ -438,7 +464,11 @@ class Helper_ExpressionResolver {
             foreach($vulnerable as $argpos) {
                 $arg = $resolved_arguments[($argpos-1)];
                 if($arg->isUserDefined()) {
-                    ScanInfo::addVulnerability(Vulnerability::get($func->getVulnerableFor()), $expr);
+                    // we have a dangerous argument, check if it got secured
+                    $attack = Attack::get($func->getVulnerableFor());
+                    if(Attack_Handler::checkAttackCondition($attack, $resolved)) {
+                        ScanInfo::addVulnerability($attack, $expr);
+                    }
                 }
             }
         }
@@ -463,6 +493,26 @@ class Helper_ExpressionResolver {
             }
         }
         return $return_user_defined;
+    }
+    
+    
+    /**
+     * Checks each user defined value if it somehow got secured. If all
+     * user defined values are secured by a mechanism: add it to return array.
+     * @return array
+     */
+    protected function argIsSecuredBy(array $arguments) {
+        $protects = array();
+        foreach($arguments as $arg) {
+            /* @var $arg Obj_Resolved */
+            if($arg->isUserDefined()) {
+                $protects[] = $arg->getSecuredBy();
+            }
+        }
+        
+        if(empty($protects)) return array();
+        if(count($protects) == 1) return $protects[0];
+        return call_user_func_array("array_intersect", $protects);
     }
     
     /**
@@ -519,15 +569,53 @@ class Helper_ExpressionResolver {
     
     
     
+    /**
+     * Resolve function calls where functions are called, that are not yet defined
+     */
+    protected function resolveExprFunctionCallNotDefined($expr) {
+        // get information about the functions parameters
+        $resolved_arguments = array();
+        $values      = array();
+        $references  = array();
+        $resolve_err = false;
+        foreach($expr->args as $arg) {
+            $val = self::resolve($arg->value);
+            /*@var $val Obj_Resolved*/
+            
+            if(!$val->isResolveError()) {
+                $resolved_arguments[] = $val;
+                $values[]             = $val->getValue();
+                $references[]         = $arg->byRef; 
+            }
+            else {
+                $resolve_err = true;
+                throw new Exception("Helper_ExpressionResolver: Error resolving an argument occured!");
+            }
+        }
+        
+        $this->obj_resolved->setValue(null);
+        
+        // return user defined?
+        $this->obj_resolved->setUserDefined($this->argIsUserdefined($resolved_arguments));
+    }
+    
+    
+    
     
     
     protected function getVulnerableParameters(Obj_Function $func, array $values) {
-        $return = false;
+        if(empty($values)) {
+            return false;
+        }
         
+        $return = false;
         // check if this function is vulnerable
         if(($func_vulnerable = $func->getVulnerableFor()) != null) {
             // vulnerable
             $return = $func->getVulnerableParameters();
+            if(is_array($return) && empty($return)) {
+                $return = range(1, count($values));
+            }
 
             // are there functions to check if the function is vulnerable?
             $vuln_func_name = $func->getFunctionToCheckForVulnerability();
